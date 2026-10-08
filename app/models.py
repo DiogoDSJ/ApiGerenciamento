@@ -30,12 +30,23 @@ class Category(Base):
     id = Column("id", Integer, primary_key=True, autoincrement=True)
     name = Column("name", String, nullable=False, unique=True)
 
+    #Auditoria de criacao
+    created_by = Column("created_by", Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    #auditoria de edicao
+    updated_by = Column("updated_by", Integer, ForeignKey("users.id"), nullable=True)
+    updated_at = Column("updated_at", DateTime(timezone=True), onupdate=func.now(), nullable=True)
+
+    #auditoria de exclusao
+    deleted_by = Column("deleted_by", Integer, ForeignKey("users.id"), nullable=True)
+    deleted_at = Column("deleted_at", DateTime(timezone=True), nullable=True)
+
     products = relationship("Product", back_populates="category")
 
-
-    def __init__(self, name: str):
-        self.name = name
-
+    created_by_user = relationship("User", foreign_keys=[created_by])
+    updated_by_user = relationship("User", foreign_keys=[updated_by])
+    deleted_by_user = relationship("User", foreign_keys=[deleted_by])
 
 
 
@@ -51,7 +62,6 @@ class Product(Base):
     sale_price = Column("sale_price", Float, nullable=False)
     minimum_stock = Column("minimum_stock", Integer, nullable=False, default=0)
     stock_quantity = Column("stock_quantity", Integer, nullable=False)
-    data_created = Column("data_created", DateTime(timezone=True), server_default=func.now(), nullable=False)
     category_id = Column("category_id", Integer, ForeignKey("categories.id"), nullable=False)
     supplier_id = Column("supplier_id", Integer, ForeignKey("suppliers.id"), nullable=False)
 
@@ -59,19 +69,18 @@ class Product(Base):
     supplier = relationship("Supplier", back_populates="products")
     stock_movements = relationship("StockMovement", back_populates="product")
 
-    def __init__(self, name: str, sku: str, cost_price: float, sale_price: float, stock_quantity: int, category_id: int, supplier_id: int, data_created=None, minimum_stock: int = 0):
-        self.name = name
-        self.sku = sku
-        self.cost_price = cost_price
-        self.sale_price = sale_price
-        self.stock_quantity = stock_quantity
-        self.minimum_stock = minimum_stock
-        self.data_created = data_created if data_created is not None else datetime.now(timezone.utc)
-        self.category_id = category_id
-        self.supplier_id = supplier_id
+    created_by = Column("created_by", Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False)
 
+    updated_by = Column("updated_by", Integer, ForeignKey("users.id"), nullable=True)
+    updated_at = Column("updated_at", DateTime(timezone=True), onupdate=func.now(), nullable=True)
 
+    deleted_by = Column("deleted_by", Integer, ForeignKey("users.id"), nullable=True)
+    deleted_at = Column("deleted_at", DateTime(timezone=True), nullable=True)
 
+    created_by_user = relationship("User", foreign_keys=[created_by])
+    updated_by_user = relationship("User", foreign_keys=[updated_by])
+    deleted_by_user = relationship("User", foreign_keys=[deleted_by])
 
 
 class Supplier(Base):
@@ -87,12 +96,19 @@ class Supplier(Base):
 
     products = relationship("Product", back_populates="supplier")
 
-    def __init__(self, name: str, cnpj: str, email: str, phone: str, address: str):
-        self.name = name
-        self.cnpj = cnpj
-        self.email = email
-        self.phone = phone
-        self.address = address
+
+    created_by = Column("created_by", Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    updated_by = Column("updated_by", Integer, ForeignKey("users.id"), nullable=True)
+    updated_at = Column("updated_at", DateTime(timezone=True), onupdate=func.now(), nullable=True)
+
+    deleted_by = Column("deleted_by", Integer, ForeignKey("users.id"), nullable=True)
+    deleted_at = Column("deleted_at", DateTime(timezone=True), nullable=True)
+
+    created_by_user = relationship("User", foreign_keys=[created_by])
+    updated_by_user = relationship("User", foreign_keys=[updated_by])
+    deleted_by_user = relationship("User", foreign_keys=[deleted_by])
 
 
 
@@ -121,18 +137,13 @@ class StockMovement(Base):
     movement_type = Column("movement_type",
     Enum(MovementType, values_callable=lambda obj: [member.value for member in obj], name="movement_type_enum"),
     nullable=False)  # 'entrada' ou 'saida'
-    data_created = Column("data_created", DateTime(timezone=True), server_default=func.now(), nullable=False)
+
 
     created_by = Column("created_by", Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False)
+
 
     product = relationship("Product", back_populates="stock_movements")
-
-    def __init__(self, product_id: int, quantity: int, movement_type: MovementType, created_by: int, data_created=None):
-        self.product_id = product_id
-        self.quantity = quantity
-        self.movement_type = movement_type
-        self.created_by = created_by
-        self.data_created = data_created if data_created is not None else datetime.now(timezone.utc)
 
 
 class UserRole(str, enum.Enum):
@@ -153,8 +164,12 @@ class User(Base):
     email = Column(String, nullable=False, unique=True)
     password = Column(String, nullable=False)
     role = Column(Enum(UserRole), nullable=False, default=UserRole.FUNCIONARIO)
-    data_created = Column("data_created", DateTime(timezone=True), server_default=func.now(), nullable=False)
 
+    created_by = Column("created_by", Integer, ForeignKey("users.id"), nullable=True)
+    created_at = Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False)
 
-    category = relationship("Category", back_populates="user")
-    stock_movements = relationship("StockMovement", back_populates="user")
+    updated_by = Column("updated_by", Integer, ForeignKey("users.id"), nullable=True)
+    updated_at = Column("updated_at", DateTime(timezone=True), onupdate=func.now(), nullable=True)
+
+    deleted_by = Column("deleted_by", Integer, ForeignKey("users.id"), nullable=True)
+    deleted_at = Column("deleted_at", DateTime(timezone=True), nullable=True)
