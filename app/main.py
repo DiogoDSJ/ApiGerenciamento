@@ -2,6 +2,10 @@ from fastapi import FastAPI
 
 app = FastAPI()
 
+from app.routers.category_routes import category_router
+
+app.include_router(category_router)
+
 
 @app.get("/")
 def read_root():
