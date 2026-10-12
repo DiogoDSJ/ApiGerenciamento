@@ -13,8 +13,6 @@ class UserSchema(BaseModel):
 
 class CategorySchema(BaseModel):
     name: str
-    created_by: int
-
     class Config:
         from_attributes = True
 
@@ -38,8 +36,6 @@ class StockMovementSchema(BaseModel):
     product_id: int
     quantity: int
     movement_type: str  # "entrada" ou "saida"
-    created_by: int
-
     class Config:
         from_attributes = True
 
@@ -52,7 +48,16 @@ class ProductSchema(BaseModel):
     stock_quantity: int
     category_id: int
     supplier_id: int
-    created_by: int
+    class Config:
+        from_attributes = True
+
+class SupplierSchema(BaseModel):
+
+    name: str
+    cnpj: str
+    email: str
+    phone: str
+    address: str
 
     class Config:
         from_attributes = True
