@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from app.models import User
-from app.dependencies import get_db_session
+from app.dependencies import get_db_session, get_current_user
 from app.main import bcrypt_context, algorithm, token_expire_minutes, secret_key, refresh_token_expire_minutes
 from app.schemas import UserSchema, LoginSchema
 from jose import jwt, JWTError
 from datetime import datetime, timedelta, timezone
+from fastapi.security import OAuth2PasswordRequestForm
+
 
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -50,9 +52,22 @@ async def create_user(user_data: UserSchema, db_session=Depends(get_db_session))
         raise HTTPException(status_code=status.HTTP_201_CREATED, detail=f"Usuário criado com sucesso. {user_data.email} {user_data.username} {user_data.role}")
 
 @auth_router.post("/login")
-async def login(loginSchema: LoginSchema, db_session=Depends(get_db_session)):
+async def login(loginSchema: OAuth2PasswordRequestForm = Depends(), db_session=Depends(get_db_session)):
     """Autentica um usuário no sistema."""
     user = authenticate_user(loginSchema.username, loginSchema.password, db_session)
     token = create_token(user.username)
     refresh_token = create_refresh_token(user.username)  # Cria um token de atualização (refresh token)
-    raise HTTPException(status_code=status.HTTP_200_OK, detail=f"Login bem-sucedido.", headers={"Authorization": f"Bearer {token}", "Refresh-Token": f"Bearer {refresh_token}"})
+    return {
+        "access_token": token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer"
+    }
+@auth_router.get("/me")
+def read_current_user(current_user: User = Depends(get_current_user)):
+    return {
+        "status": "autenticado",
+        "id": current_user.id,
+        "username": current_user.username,
+        "email": current_user.email,
+        "role": current_user.role
+    }
