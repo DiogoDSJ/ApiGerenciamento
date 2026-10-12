@@ -10,7 +10,8 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     DateTime,
-    func
+    func,
+    Index
 )
 from sqlalchemy.orm import declarative_base, relationship
 from dotenv import load_dotenv
@@ -28,7 +29,7 @@ class Category(Base):
     __tablename__ = "categories"
 
     id = Column("id", Integer, primary_key=True, autoincrement=True)
-    name = Column("name", String, nullable=False, unique=True)
+    name = Column("name", String, nullable=False)
 
     #Auditoria de criacao
     created_by = Column("created_by", Integer, ForeignKey("users.id"), nullable=False)
@@ -49,6 +50,14 @@ class Category(Base):
     deleted_by_user = relationship("User", foreign_keys=[deleted_by])
 
 
+    __table_args__ = (
+        Index(
+            "ix_categories_active_name_unique",
+            "name",
+            unique=True,
+            postgresql_where=(deleted_at.is_(None)),
+        ),
+    )
 
 
 class Product(Base):
@@ -56,8 +65,8 @@ class Product(Base):
     __tablename__ = "products"
 
     id = Column("id", Integer, primary_key=True, autoincrement=True)
-    name = Column("name", String, nullable=False, unique=False)
-    sku = Column("sku", String, nullable=False, unique=True)
+    name = Column("name", String, nullable=False)
+    sku = Column("sku", String, nullable=False)
     cost_price = Column("cost_price", Float, nullable=False)
     sale_price = Column("sale_price", Float, nullable=False)
     minimum_stock = Column("minimum_stock", Integer, nullable=False, default=0)
@@ -83,14 +92,23 @@ class Product(Base):
     deleted_by_user = relationship("User", foreign_keys=[deleted_by])
 
 
+    __table_args__ = (
+        Index(
+            "ix_products_active_sku_unique",
+            "sku",
+            unique=True,
+            postgresql_where=(deleted_at.is_(None)),
+        ),
+    )
+
 class Supplier(Base):
     """Represents a supplier in the inventory system."""
     __tablename__ = "suppliers"
 
     id = Column("id", Integer, primary_key=True, autoincrement=True)
     name = Column("name", String, nullable=False)
-    cnpj = Column("cnpj", String, nullable=False, unique=True)
-    email = Column("email", String, nullable=False, unique=True)
+    cnpj = Column("cnpj", String, nullable=False)
+    email = Column("email", String, nullable=False)
     phone = Column("phone", String, nullable=False)
     address = Column("address", String, nullable=False)
 
@@ -110,6 +128,22 @@ class Supplier(Base):
     updated_by_user = relationship("User", foreign_keys=[updated_by])
     deleted_by_user = relationship("User", foreign_keys=[deleted_by])
 
+    __table_args__ = (
+        # CNPJ único apenas entre ativos:
+        Index(
+            "ix_suppliers_active_cnpj_unique",
+            "cnpj",
+            unique=True,
+            postgresql_where=(deleted_at.is_(None)),
+        ),
+        # Email de contato único apenas entre ativos:
+        Index(
+            "ix_suppliers_active_email_unique",
+            "email",
+            unique=True,
+            postgresql_where=(deleted_at.is_(None)),
+        ),
+    )
 
 
 
@@ -160,8 +194,8 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    username = Column(String, nullable=False, unique=True)
-    email = Column(String, nullable=False, unique=True)
+    username = Column(String, nullable=False)
+    email = Column(String, nullable=False)
     password = Column(String, nullable=False)
     role = Column(Enum(UserRole), nullable=False, default=UserRole.FUNCIONARIO)
 
@@ -173,3 +207,20 @@ class User(Base):
 
     deleted_by = Column("deleted_by", Integer, ForeignKey("users.id"), nullable=True)
     deleted_at = Column("deleted_at", DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        # usuario único apenas entre ativos:
+        Index(
+            "ix_users_active_username_unique",
+            "username",
+            unique=True,
+            postgresql_where=(deleted_at.is_(None)),
+        ),
+        # Email de contato único apenas entre ativos:
+        Index(
+            "ix_users_active_email_unique",
+            "email",
+            unique=True,
+            postgresql_where=(deleted_at.is_(None)),
+        ),
+    )
