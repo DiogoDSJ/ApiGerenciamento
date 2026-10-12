@@ -20,6 +20,7 @@ from app.routers.supplier_routes import supplier_router
 
 app.include_router(category_router)
 app.include_router(auth_router)
+app.include_router(supplier_router)
 
 @app.get("/")
 def read_root():
