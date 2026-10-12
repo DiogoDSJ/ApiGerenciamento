@@ -1,3 +1,4 @@
+import os
 import enum
 from datetime import datetime, timezone
 from sqlalchemy import (
@@ -13,7 +14,6 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import declarative_base, relationship
 from dotenv import load_dotenv
-import os
 
 
 load_dotenv()
