@@ -24,7 +24,7 @@ async def create_category(category_data: CategorySchema, db_session=Depends(get_
     raise HTTPException(status_code=status.HTTP_201_CREATED, detail=f"Categoria criada com sucesso. {category_data.name} por {current_user.username}")
 
 @category_router.delete("/delete/{category_id}")
-async def delete_category(category_id: int, category_data: CategorySchema, db_session=Depends(get_db_session), admin_user=Depends(require_admin)):
+async def delete_category(category_id: int, db_session=Depends(get_db_session), admin_user=Depends(require_admin)):
     """Exclui uma categoria do sistema."""
     category = db_session.query(Category).filter(Category.id == category_id, Category.deleted_at.is_(None)).first()
     if not category: # falta ver se ainda tem produto atribuido a categoria, se tiver, não deixa excluir
