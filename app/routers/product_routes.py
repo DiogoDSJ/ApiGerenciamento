@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from app.models import Product
 from app.dependencies import get_db_session, get_current_user
 from app.schemas import ProductSchema
+from datetime import datetime, timezone
 
 product_router = APIRouter(prefix="/product", tags=["product"])
 
