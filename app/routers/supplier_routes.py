@@ -47,9 +47,6 @@ async def update_supplier(supplier_id: int, supplier_data: SupplierSchema, db_se
     if not supplier: # Olha se a categoria existe, se não existir, não deixa atualizar e tambem falta verificar se a categoria tem produtos vinculados, se tiver, não deixa atualizar
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Categoria não encontrada.")
     #preciso verificar se o nome novo nao ja existe
-    filter1 = db_session.query(Supplier).filter(Supplier.cnpj == supplier_data.cnpj, Supplier.deleted_at.is_(None)).first()
-    if filter1 is not None:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ja existe uma empresa com esse CNPJ")
     filter2 = db_session.query(Supplier).filter(Supplier.email == supplier_data.email, Supplier.deleted_at.is_(None)).first()
     if filter2 is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ja existe uma empresa com esse email")
@@ -58,7 +55,6 @@ async def update_supplier(supplier_id: int, supplier_data: SupplierSchema, db_se
     supplier.email = supplier_data.email
     supplier.phone = supplier_data.phone
     supplier.address = supplier_data.address
-    supplier.cnpj = supplier_data.cnpj
     supplier.updated_at = datetime.now(timezone.utc)
     supplier.updated_by = current_user.id  # Supondo que você tenha uma forma de obter o usuário atual
     db_session.commit()
