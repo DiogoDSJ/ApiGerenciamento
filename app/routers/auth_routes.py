@@ -31,7 +31,7 @@ def create_refresh_token(username):
 
 def authenticate_user(username, password, db_session):
     """Função para autenticar um usuário com base no nome de usuário e senha."""
-    user = db_session.query(User).filter(User.username == username).first()
+    user = db_session.query(User).filter(User.username == username, User.deleted_at.is_(None)).first()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado.")
     if not bcrypt_context.verify(password, user.password):
@@ -41,7 +41,7 @@ def authenticate_user(username, password, db_session):
 @auth_router.post("/create_user")
 async def create_user(user_data: UserSchema, db_session=Depends(get_db_session)):
     """Cria um novo usuário no sistema."""
-    user = db_session.query(User).filter((User.username == user_data.username) | (User.email == user_data.email)).first()
+    user = db_session.query(User).filter((User.username == user_data.username), User.deleted_at.is_(None)).first()
     if user:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Usuário já existe.")
     else:
