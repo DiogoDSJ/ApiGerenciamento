@@ -52,7 +52,7 @@ async def create_user(user_data: UserSchema, db_session=Depends(get_db_session))
         raise HTTPException(status_code=status.HTTP_201_CREATED, detail=f"Usuário criado com sucesso. {user_data.email} {user_data.username} {user_data.role}")
 
 @auth_router.post("/login")
-async def login(loginSchema: OAuth2PasswordRequestForm = Depends(), db_session=Depends(get_db_session)):
+async def login(loginSchema: LoginSchema = Depends(), db_session=Depends(get_db_session)):
     """Autentica um usuário no sistema."""
     user = authenticate_user(loginSchema.username, loginSchema.password, db_session)
     token = create_acess_token(user.username)
@@ -83,8 +83,6 @@ def refresh_token_endpoint(payload_data: RefreshTokenRequest, db_session = Depen
 
     new_acess_token = create_acess_token(user.username)
 
-
-    
     return {
         "access_token": new_acess_token,
         "token_type": "bearer"
