@@ -20,16 +20,11 @@ class LoginSchema(BaseModel):
     username: str
     password: str
 
-    class Config:
-        from_attributes = True
 
 class TokenSchema(BaseModel):
     access_token: str
     refresh_token: str
     token_type: str = "bearer"
-
-    class Config:
-        from_attributes = True
 
 
 class StockMovementSchema(BaseModel):
@@ -61,3 +56,6 @@ class SupplierSchema(BaseModel):
 
     class Config:
         from_attributes = True
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str

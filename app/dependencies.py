@@ -36,6 +36,28 @@ def get_current_user(token: str = Depends(oauth2_scheme), get_db = Depends(get_d
 
     return user
 
+def verify_refresh_token(token: str):
+    credentials_exception = HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token inválido ou expirado.", headers={"WWW-Authenticate": "Bearer"})
+
+    try:
+        payload = jwt.decode(token, secret_key, algorithms=[algorithm])
+
+        token_type = payload.get("type")
+        if token_type != "refresh":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Tipo de token inválido. Esperava-se um refresh token.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        get_user_identifier: str = payload.get("sub")
+        if get_user_identifier is None:
+            raise credentials_exception
+
+        return get_user_identifier
+
+    except JWTError:
+        # token expirado
+        raise credentials_exception
 
 def require_admin(current_user: User = Depends(get_current_user)):
     """Trava a rota se o usuário não for administrador."""

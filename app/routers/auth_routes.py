@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from app.models import User
-from app.dependencies import get_db_session, get_current_user
+from app.dependencies import get_db_session, get_current_user, verify_refresh_token
 from app.main import bcrypt_context, algorithm, token_expire_minutes, secret_key, refresh_token_expire_minutes
-from app.schemas import UserSchema, LoginSchema
+from app.schemas import UserSchema, LoginSchema, RefreshTokenRequest
 from jose import jwt, JWTError
 from datetime import datetime, timedelta, timezone
 from fastapi.security import OAuth2PasswordRequestForm
@@ -15,7 +15,7 @@ async def read_root():
     """Rota raiz do módulo de autenticação."""
     return {"message": "Bem-vindo ao módulo de autenticação!"}
 
-def create_token(username):
+def create_acess_token(username):
     """Função para criar um token de autenticação (JWT) para o usuário."""
     expire_data = datetime.now(timezone.utc) + timedelta(minutes=token_expire_minutes)
     payload = {"sub": username, "exp": expire_data, "iat": datetime.now(timezone.utc), "type": "access"}
@@ -55,7 +55,7 @@ async def create_user(user_data: UserSchema, db_session=Depends(get_db_session))
 async def login(loginSchema: OAuth2PasswordRequestForm = Depends(), db_session=Depends(get_db_session)):
     """Autentica um usuário no sistema."""
     user = authenticate_user(loginSchema.username, loginSchema.password, db_session)
-    token = create_token(user.username)
+    token = create_acess_token(user.username)
     refresh_token = create_refresh_token(user.username)  # Cria um token de atualização (refresh token)
     return {
         "access_token": token,
@@ -71,3 +71,24 @@ def read_current_user(current_user: User = Depends(get_current_user)):
         "email": current_user.email,
         "role": current_user.role
     }
+
+@auth_router.post("/refresh")
+def refresh_token_endpoint(payload_data: RefreshTokenRequest, db_session = Depends(get_db_session)): # nao coloquei uma forma de inutilizar o refresh token antigo
+    """Recarrega o acess token e da um novo refresh token"""
+    username = verify_refresh_token(payload_data.refresh_token)
+    user = db_session.query(User).filter(User.username == username, User.deleted_at.is_(None)).first()
+
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado.")
+
+    new_acess_token = create_acess_token(user.username)
+
+
+    
+    return {
+        "access_token": new_acess_token,
+        "token_type": "bearer"
+    }
+
+
+
