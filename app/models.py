@@ -73,7 +73,7 @@ class Product(Base):
     minimum_stock = Column("minimum_stock", Integer, nullable=False, default=0)
     stock_quantity = Column("stock_quantity", Integer, nullable=False)
     category_id = Column("category_id", Integer, ForeignKey("categories.id"), nullable=False)
-    supplier_id = Column("supplier_id", Integer, ForeignKey("suppliers.id"), nullable=False)
+    supplier_id = Column("supplier_id", Integer, ForeignKey("suppliers.id"), nullable=True)
 
     category = relationship("Category", back_populates="products")
     supplier = relationship("Supplier", back_populates="products")
@@ -159,6 +159,8 @@ class MovementType(str, enum.Enum):
     """
     ENTRADA = "entrada"
     SAIDA = "saida"
+    PERDA = "perda"
+    AJUSTE = "ajuste"
 
 
 
@@ -176,13 +178,14 @@ class StockMovement(Base):
     movement_type = Column("movement_type",
     Enum(MovementType, values_callable=lambda obj: [member.value for member in obj], name="movement_type_enum"),
     nullable=False)  # 'entrada' ou 'saida'
-
+    reason = Column(String(255), nullable=True)
 
     created_by = Column("created_by", Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
     product = relationship("Product", back_populates="stock_movements")
+    user = relationship("User", backref="stock_movements")
 
     __table_args__ = (
         # Garante no PostgreSQL que a quantidade movimentada seja sempre positiva e maior que zero
