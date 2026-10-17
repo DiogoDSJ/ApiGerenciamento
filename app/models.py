@@ -11,7 +11,8 @@ from sqlalchemy import (
     ForeignKey,
     DateTime,
     func,
-    Index
+    Index,
+    CheckConstraint
 )
 from sqlalchemy.orm import declarative_base, relationship
 from dotenv import load_dotenv
@@ -99,6 +100,10 @@ class Product(Base):
             unique=True,
             postgresql_where=(deleted_at.is_(None)),
         ),
+        CheckConstraint("stock_quantity >= 0", name="check_product_stock_quantity_positive"),
+        CheckConstraint("minimum_stock >= 0", name="check_product_min_stock_positive"),
+        CheckConstraint("cost_price >= 0", name="check_product_cost_price_positive"),
+        CheckConstraint("sale_price >= 0", name="check_product_sale_price_positive"),
     )
 
 class Supplier(Base):
@@ -178,6 +183,11 @@ class StockMovement(Base):
 
 
     product = relationship("Product", back_populates="stock_movements")
+
+    __table_args__ = (
+        # Garante no PostgreSQL que a quantidade movimentada seja sempre positiva e maior que zero
+        CheckConstraint("quantity > 0", name="check_stock_movement_quantity_strictly_positive"),
+    )
 
 
 class UserRole(str, enum.Enum):
