@@ -35,7 +35,7 @@ def get_specific_user(user_id: int, db_session = Depends(get_db_session), admin_
     else:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario não encontrado.")
 
-@user_router.patch("/modify/{user_id}")
+@user_router.patch("/update/{user_id}")
 def modify_user(user_id: int, userUpdate: UserUpdate, db_session = Depends(get_db_session), admin_user = Depends(require_admin)):
     """Modifica um usuario"""
     user = db_session.query(User).filter(User.id == user_id, User.deleted_at.is_(None)).first()
@@ -56,12 +56,11 @@ def modify_user(user_id: int, userUpdate: UserUpdate, db_session = Depends(get_d
 
     if conflict_conditions:
         conflict_user = db_session.query(User).filter(User.id != user.id, User.deleted_at.is_(None),or_(*conflict_conditions),).first()
-
-    if conflict_user:
-        if conflict_user.username == userUpdate.username:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nome de usuario ja em uso")
-        if conflict_user.email == userUpdate.email:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email ja em uso")
+        if conflict_user:
+            if conflict_user.username == userUpdate.username:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nome de usuario ja em uso")
+            if conflict_user.email == userUpdate.email:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email ja em uso")
 
     update_dict = userUpdate.model_dump(exclude_unset=True)
     for field, value in update_dict.items():
