@@ -5,7 +5,6 @@ from app.main import bcrypt_context, algorithm, token_expire_minutes, secret_key
 from app.schemas import UserSchema, LoginSchema, RefreshTokenRequest
 from jose import jwt, JWTError
 from datetime import datetime, timedelta, timezone
-from fastapi.security import OAuth2PasswordRequestForm
 
 
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
