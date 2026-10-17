@@ -3,6 +3,7 @@ from app.dependencies import get_current_user, get_db_session, require_admin
 from app.models import Supplier
 from app.schemas import SupplierSchema
 from datetime import datetime, timezone
+from sqlalchemy import or_
 
 supplier_router = APIRouter(prefix="/supplier", tags=["supplier"])
 
@@ -47,16 +48,34 @@ async def update_supplier(supplier_id: int, supplier_data: SupplierSchema, db_se
     if not supplier: # Olha se a categoria existe, se não existir, não deixa atualizar e tambem falta verificar se a categoria tem produtos vinculados, se tiver, não deixa atualizar
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Categoria não encontrada.")
     #preciso verificar se o nome novo nao ja existe
-    filter2 = db_session.query(Supplier).filter(Supplier.email == supplier_data.email, Supplier.deleted_at.is_(None)).first()
-    if filter2 is not None:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ja existe uma empresa com esse email")
 
-    supplier.name = supplier_data.name
-    supplier.email = supplier_data.email
-    supplier.phone = supplier_data.phone
-    supplier.address = supplier_data.address
-    supplier.updated_at = datetime.now(timezone.utc)
+    conflict_conditions = []
+
+
+    if (supplier_data.name is not None and supplier_data.name != supplier.name):
+        conflict_conditions.append(Supplier.name == supplier_data.name)
+    if (supplier_data.email is not None and supplier_data.email != supplier.email):
+        conflict_conditions.append(Supplier.email == supplier_data.email)
+    if (supplier_data.phone is not None and supplier_data.phone != supplier.phone):
+            conflict_conditions.append(Supplier.phone == supplier_data.phone)
+
+    if conflict_conditions:
+        conflict_supplier = db_session.query(Supplier).filter(Supplier.id != supplier.id, Supplier.deleted_at.is_(None),or_(*conflict_conditions),).first()
+        if conflict_supplier:
+            if conflict_supplier.name == supplier_data.name:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nome ja em uso")
+            if conflict_supplier.email == supplier_data.email:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Email ja em uso")
+            if conflict_supplier.phone == supplier_data.phone:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Telefone ja em uso")
+
+
+    update_dict = supplier_data.model_dump(exclude_unset=True)
+    for field, value in update_dict.items():
+        setattr(supplier, field, value)
+
     supplier.updated_by = current_user.id  # Supondo que você tenha uma forma de obter o usuário atual
     db_session.commit()
-    raise HTTPException(status_code=status.HTTP_200_OK, detail=f"Fornecedor atualizado com sucesso. {supplier.name} usuario que atualizou: {current_user.username}")
+    db_session.refresh(supplier)
+    return supplier
 
