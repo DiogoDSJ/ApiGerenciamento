@@ -4,6 +4,7 @@ from app.dependencies import get_current_user, require_admin, get_db_session
 from app.schemas import UserSchema, UserUpdate
 from sqlalchemy import or_
 from datetime import datetime, timezone
+from app.main import bcrypt_context
 
 user_router = APIRouter(prefix="/users", tags=["users"])
 
@@ -13,7 +14,7 @@ async def read_root():
     """Rota raiz da rota de usuario"""
     return {"message": "Bem-vindo ao módulo de usuarios!"}
 
-@user_router.get("/users")
+@user_router.get("/all")
 def get_all_users(skip:int=0, limit:int = 100, include_deleted: bool = Query(False, description="Se verdadeiro, inclui usuários inativados/excluídos via soft delete"), db_session=Depends(get_db_session), admin_user=Depends(require_admin )):
     """Retorna todas os usuarios disponíveis no sistema. deletados? sim ou nao"""
     if include_deleted is False:
@@ -22,7 +23,7 @@ def get_all_users(skip:int=0, limit:int = 100, include_deleted: bool = Query(Fal
         users = (db_session.query(User).offset(skip).limit(limit).all())
     return users
 
-@user_router.get("/users/{user_id}")
+@user_router.get("/search/{user_id}")
 def get_specific_user(user_id: int, db_session = Depends(get_db_session), admin_user = Depends(require_admin)):
     """Retorna informacao de um usuario especifico"""
     if user_id is not None:
@@ -34,7 +35,7 @@ def get_specific_user(user_id: int, db_session = Depends(get_db_session), admin_
     else:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario não encontrado.")
 
-@user_router.patch("/users/{user_id}")
+@user_router.patch("/modify/{user_id}")
 def modify_user(user_id: int, userUpdate: UserUpdate, db_session = Depends(get_db_session), admin_user = Depends(require_admin)):
     """Modifica um usuario"""
     user = db_session.query(User).filter(User.id == user_id, User.deleted_at.is_(None)).first()
@@ -73,7 +74,7 @@ def modify_user(user_id: int, userUpdate: UserUpdate, db_session = Depends(get_d
     return user
 
 
-@user_router.delete("users/delete/{user_id}")
+@user_router.delete("/delete/{user_id}")
 def delete_user(user_id : int, db_session = Depends(get_db_session), admin_user = Depends(require_admin)):
     if user_id == admin_user.id:
         raise HTTPException(
@@ -90,3 +91,13 @@ def delete_user(user_id : int, db_session = Depends(get_db_session), admin_user 
     db_session.refresh(user)
     return user
 
+@user_router.patch("/{user_id}/password")
+def change_user_password(user_id : int, new_password : str, db_session = Depends(get_db_session), admin_user = Depends(require_admin)):
+    user = db_session.query(User).filter(User.id == user_id, User.deleted_at.is_(None)).first()
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario não encontrado.")
+    user.password = bcrypt_context.hash(new_password)
+    user.updated_by = admin_user.id
+
+    db_session.commit()
+    return None
