@@ -1,26 +1,68 @@
 import os
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, status
 from passlib.context import CryptContext
 from dotenv import load_dotenv
-
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
 
 load_dotenv()
 secret_key = os.getenv("SECRET_KEY")
 algorithm = os.getenv("ALGORITHM")
 token_expire_minutes = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 1))
 refresh_token_expire_minutes = int(os.getenv("REFRESH_TOKEN_EXPIRE_MINUTES", 1))
-app = FastAPI()
+app = FastAPI(title="API Estoque")
+
+TRANSLATIONS = {
+    "string_too_short": "Deve ter no mínimo {min_length} caracteres.",
+    "string_too_long": "Deve ter no máximo {max_length} caracteres.",
+    "missing": "Campo obrigatório.",
+    "enum": "Opção inválida. Escolha uma das opções válidas.",
+    "value_error": "Valor informado é inválido.",
+}
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(
+    request: Request, exc: RequestValidationError
+):
+    errors = {}
+
+    for err in exc.errors():
+        # Extrai o nome do campo (último elemento de loc, ignorando 'body')
+        field_name = err["loc"][-1] if err["loc"] else "geral"
+        err_type = err["type"]
+        ctx = err.get("ctx", {})
+
+        # Usa mensagem customizada do field_validator se houver
+        if err_type == "value_error" and "Value error, " in err["msg"]:
+            msg = err["msg"].replace("Value error, ", "")
+        elif err_type in TRANSLATIONS:
+            msg = TRANSLATIONS[err_type].format(**ctx)
+        else:
+            msg = err["msg"]
+
+        errors[str(field_name)] = msg
+
+    return JSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+        content={
+            "message": "Erro de validação nos campos informados.",
+            "errors": errors,
+        },
+    )
 
 bcrypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 from app.routers.category_routes import category_router
 from app.routers.auth_routes import auth_router
 from app.routers.supplier_routes import supplier_router
+from app.routers.user_routes import user_router
 
 
 app.include_router(category_router)
 app.include_router(auth_router)
 app.include_router(supplier_router)
+app.include_router(user_router)
 
 @app.get("/")
 def read_root():
