@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from app.models import User
 from app.dependencies import get_db_session, get_current_user, verify_refresh_token
-from app.main import bcrypt_context, algorithm, token_expire_minutes, secret_key, refresh_token_expire_minutes
+from app.security import bcrypt_context, algorithm, token_expire_minutes, secret_key, refresh_token_expire_minutes
 from app.schemas import UserSchema, LoginSchema, RefreshTokenRequest
 from jose import jwt, JWTError
 from datetime import datetime, timedelta, timezone

@@ -4,7 +4,7 @@ from app.dependencies import get_current_user, require_admin, get_db_session
 from app.schemas import UserSchema, UserUpdate
 from sqlalchemy import or_
 from datetime import datetime, timezone
-from app.main import bcrypt_context
+from app.security import bcrypt_context
 
 user_router = APIRouter(prefix="/users", tags=["users"])
 

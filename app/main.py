@@ -1,15 +1,8 @@
-import os
 from fastapi import FastAPI, Request, status
-from passlib.context import CryptContext
-from dotenv import load_dotenv
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 
-load_dotenv()
-secret_key = os.getenv("SECRET_KEY")
-algorithm = os.getenv("ALGORITHM")
-token_expire_minutes = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 1))
-refresh_token_expire_minutes = int(os.getenv("REFRESH_TOKEN_EXPIRE_MINUTES", 1))
+
 app = FastAPI(title="API Estoque")
 
 TRANSLATIONS = {
@@ -51,7 +44,6 @@ async def validation_exception_handler(
         },
     )
 
-bcrypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 from app.routers.category_routes import category_router
 from app.routers.auth_routes import auth_router
