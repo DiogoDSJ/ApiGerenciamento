@@ -22,10 +22,6 @@ async def create_product(productSchema: ProductSchema, db_session = Depends(get_
     category = db_session.query(Category).filter((Category.id == productSchema.category_id, Category.deleted_at.is_(None))).first()
     if category is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail = "Categoria nao encontrada")
-    # tenho que ver o que vou fazer com fornecedor, mas por enquanto
-    supplier = db_session.query(Supplier).filter((Supplier.id == productSchema.supplier_id, Supplier.deleted_at.is_(None))).first()
-    if supplier is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail = "Fornecedor nao encontrado")
 
     if productSchema.cost_price < 0:
         raise HTTPException(status_code=status.HTTP_406_NOT_ACCEPTABLE, detail = "O valor de custo deve ser zero ou maior que zero")
