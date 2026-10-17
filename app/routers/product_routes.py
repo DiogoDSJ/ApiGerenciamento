@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
-from app.models import Product, Category, Supplier
+from app.models import Product, Category, Supplier, StockMovement, MovementType
 from app.dependencies import get_db_session, get_current_user
-from app.schemas import ProductSchema
+from app.schemas import ProductCreate
 from datetime import datetime, timezone
 
 product_router = APIRouter(prefix="/product", tags=["product"])
@@ -13,31 +13,33 @@ async def return_all_products():
 
 
 @product_router.post("/create")
-async def create_product(productSchema: ProductSchema, db_session = Depends(get_db_session), current_user = Depends(get_current_user)):
-    get_product = db_session.query(Product).filter((Product.sku == productSchema.sku, Product.deleted_at.is_(None))).first()
-    if get_product.sku == productSchema.sku:
+def create_product(productSchema: ProductCreate, db_session = Depends(get_db_session), current_user = Depends(get_current_user)):
+    conflict_conditions = db_session.query(Product).filter(Product.sku == productSchema.sku, Product.deleted_at.is_(None)).first()
+    if conflict_conditions and conflict_conditions.sku == productSchema.sku:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Produto com esse sku já existe")
-
     #verificando se a categoria existe, acho que fornecedor não é obrigatorio, já que o produto pode existir, mas estar sem um fornecedor no momento
-    category = db_session.query(Category).filter((Category.id == productSchema.category_id, Category.deleted_at.is_(None))).first()
+    category = db_session.query(Category).filter(Category.id == productSchema.category_id, Category.deleted_at.is_(None)).first()
     if category is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail = "Categoria nao encontrada")
+    if productSchema.supplier_id is not None:
+        supplier = db_session.query(Supplier).filter(Supplier.id == productSchema.supplier_id, Supplier.deleted_at.is_(None)).first()
+        if supplier is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail = "Fornecedor nao encontrado")
 
-    if productSchema.cost_price < 0:
-        raise HTTPException(status_code=status.HTTP_406_NOT_ACCEPTABLE, detail = "O valor de custo deve ser zero ou maior que zero")
-    elif productSchema.sale_price < 0:
-        raise HTTPException(status_code=status.HTTP_406_NOT_ACCEPTABLE, detail = "O valor de venda deve ser zero ou maior que zero")
-    elif productSchema.minimum_stock < 0:
-        raise HTTPException(status_code=status.HTTP_406_NOT_ACCEPTABLE, detail = "O valor de estoque minimo deve ser zero ou maior que zero")
-    elif productSchema.stock_quantity < 0:
-        raise HTTPException(status_code=status.HTTP_406_NOT_ACCEPTABLE, detail = "A quantia de estoque deve ser zero ou maior que zero")
-    new_product = Product(name=productSchema.name, sku=productSchema.sku, cost_price=productSchema.cost_price, sale_price= productSchema.sale_price, minimum_stock = productSchema.minimum_stock, stock_quantity= productSchema.stock_quantity, category_id=productSchema.category_id, supplier_id=productSchema.supplier_id, created_by=current_user.id)
+    new_product = Product(name=productSchema.name, sku=productSchema.sku, cost_price=productSchema.cost_price, sale_price= productSchema.sale_price, minimum_stock = productSchema.minimum_stock, stock_quantity= productSchema.initial_stock, category_id=productSchema.category_id, supplier_id=productSchema.supplier_id, created_by=current_user.id)
+
+
     db_session.add(new_product)
+    db_session.flush()
+
+    if productSchema.initial_stock > 0:
+        first_stock_movement = StockMovement(product_id=new_product.id, quantity=productSchema.initial_stock, movement_type=MovementType.ENTRADA, reason="Quantia inicial cadastrada no estoque.", created_by=current_user.id)
+        db_session.add(first_stock_movement)
+
     db_session.commit()
-    raise HTTPException(status_code=status.HTTP_201_CREATED, detail=f"Produto criada com sucesso. {new_product.name} {new_product.created_by}")
+    db_session.refresh(new_product)
+    return new_product
 
 
 
 
-
-## para criar uma rota de adicionar quantidades de produto eu preciso mexer com os stocksmovemnts pelo jeito, trabalho da dis viu

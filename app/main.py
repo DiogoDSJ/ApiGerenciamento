@@ -49,12 +49,14 @@ from app.routers.category_routes import category_router
 from app.routers.auth_routes import auth_router
 from app.routers.supplier_routes import supplier_router
 from app.routers.user_routes import user_router
+from app.routers.product_routes import product_router
 
 
 app.include_router(category_router)
 app.include_router(auth_router)
 app.include_router(supplier_router)
 app.include_router(user_router)
+app.include_router(product_router)
 
 @app.get("/")
 def read_root():

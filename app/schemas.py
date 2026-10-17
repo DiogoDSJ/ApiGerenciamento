@@ -100,9 +100,27 @@ class ProductSchema(BaseModel):
         examples=[50],
     )
     category_id: int
-    supplier_id: int
+    supplier_id: int | None = Field(default=None, gt=0, examples=[2])
     class Config:
         from_attributes = True
+
+class ProductCreate(BaseModel):
+    name: str = Field(
+        ...,
+        min_length=2,
+        max_length=150,
+        examples=["Farinha de Trigo Especial 1kg"],
+    )
+    sku: str = Field(..., min_length=2, max_length=50, examples=["FAR-TRI-001"])
+    sale_price: Decimal = Field(..., gt=0, decimal_places=2, examples=[8.50])
+    cost_price: Decimal | None = Field(
+        default=None, ge=0, decimal_places=2, examples=[5.20]
+    )
+    minimum_stock: int = Field(default=0, ge=0, examples=[10])
+    initial_stock: int = Field(default=0, ge=0, examples=[50])
+
+    category_id: int = Field(..., gt=0, examples=[1])
+    supplier_id: int | None = Field(default=None, gt=0, examples=[2])
 
 class SupplierSchema(BaseModel):
 
