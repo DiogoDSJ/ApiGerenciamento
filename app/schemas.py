@@ -152,3 +152,25 @@ class SupplierSchema(BaseModel):
 
 class RefreshTokenRequest(BaseModel):
     refresh_token: str
+
+
+class ProductResponse(BaseModel):
+    id: int
+    name: str
+    sku: str
+    sale_price: Decimal
+    cost_price: Decimal | None
+    stock_quantity: int
+    minimum_stock: int
+    category_id: int
+    supplier_id: int | None
+
+    class Config:
+        from_attributes = True
+
+
+class ProductPaginatedResponse(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    items: list[ProductResponse]
