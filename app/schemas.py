@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field, EmailStr
 from app.models import UserRole
 from decimal import Decimal
+from datetime import datetime
 
 class UserSchema(BaseModel):
     username: str = Field(
@@ -164,6 +165,13 @@ class ProductResponse(BaseModel):
     minimum_stock: int
     category_id: int
     supplier_id: int | None
+    created_at: datetime
+    updated_at: datetime | None
+    deleted_at: datetime | None
+
+    created_by: int
+    updated_by: int | None
+    deleted_by: int | None
 
     class Config:
         from_attributes = True
@@ -174,3 +182,36 @@ class ProductPaginatedResponse(BaseModel):
     page: int
     page_size: int
     items: list[ProductResponse]
+
+class ProductUpdate(BaseModel):
+    name: str = Field(
+        ...,
+        min_length=2,
+        max_length=150,
+        examples=["Farinha de Trigo Especial 1kg"],
+    )
+    sku: str = Field(..., min_length=2, max_length=50, examples=["FAR-TRI-001"])
+    cost_price: Decimal | None = Field(
+            default=None,
+            gt=0,  # Maior que zero estrito
+            max_digits=10,  # Até 99.999.999,99
+            decimal_places=2,
+            description="Preço final de venda",
+            examples=[19.90],
+        )
+    sale_price: Decimal = Field(
+        gt=0,  # Maior que zero estrito
+        max_digits=10,  # Até 99.999.999,99
+        decimal_places=2,
+        description="Preço final de venda",
+        examples=[19.90],
+    )
+    minimum_stock: int = Field(
+        default=0,
+        ge=0,
+        le=100_000,
+        description="Ponto de pedido / estoque mínimo de segurança",
+        examples=[10],
+    )
+    category_id: int = Field(..., gt=0, examples=[1])
+    supplier_id: int | None = Field(default=None, gt=0, examples=[2])

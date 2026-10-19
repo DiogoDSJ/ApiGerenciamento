@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from app.models import Product, Category, Supplier, StockMovement, MovementType
 from app.dependencies import get_db_session, get_current_user
-from app.schemas import ProductCreate, ProductPaginatedResponse, ProductResponse
+from app.schemas import ProductCreate, ProductPaginatedResponse, ProductResponse, ProductUpdate
 from datetime import datetime, timezone
 from sqlalchemy import or_
 
@@ -77,3 +77,34 @@ def create_product(productSchema: ProductCreate, db_session = Depends(get_db_ses
     db_session.refresh(new_product)
     return new_product
 
+
+@product_router.patch("/modify", response_model =ProductResponse)
+def modify_product(product_id: int, product_data: ProductUpdate, db_session = Depends(get_db_session), current_user = Depends(get_current_user)):
+
+    product = db_session.query(Product).filter(Product.deleted_at.is_(None), Product.id == product_id).first()
+    if not product:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail = "Produto nao encontrado")
+    update_data = product_data.model_dump(exclude_unset=True)
+    new_sku = update_data.get("sku")
+    if new_sku:
+        product_data = db_session.query(Product).filter(Product.deleted_at.is_(None), Product.id != product.id, Product.sku == new_sku).first()
+    if(product_data):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail = "Já existe um produto com esse sku")
+    new_category = update_data.get("category_id")
+    new_supplier = update_data.get("supplier_id")
+    if new_category is not None:
+        category = db_session.query(Category).filter(Category.id == new_category, Category.deleted_at.is_(None)).first()
+        if category is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail = "Categoria nao encontrada")
+    if new_supplier is not None:
+        supplier = db_session.query(Supplier).filter(Supplier.id == new_supplier, Supplier.deleted_at.is_(None)).first()
+        if supplier is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail = "Fornecedor nao encontrado")
+
+    for field, value in update_data.items():
+        setattr(product, field, value)
+
+    product.updated_by = current_user.id
+    db_session.commit()
+    db_session.refresh(product)
+    return product
