@@ -9,8 +9,9 @@ category_router = APIRouter(prefix="/category", tags=["category"])
 @category_router.get("/list")
 async def return_all_category(skip:int=0, limit:int = 100, db_session=Depends(get_db_session), current_user=Depends(get_current_user)):
     """Retorna todas as categorias disponíveis no sistema."""
-    categories = (db_session.query(Category).filter(Category.deleted_at.is_(None)).offset(skip).limit(limit).all())
-    return categories
+    if(current_user):
+        categories = (db_session.query(Category).filter(Category.deleted_at.is_(None)).offset(skip).limit(limit).all())
+        return categories
 
 @category_router.post("/create")
 async def create_category(category_data: CategorySchema, db_session=Depends(get_db_session), current_user=Depends(get_current_user)):
