@@ -4,6 +4,7 @@ from app.dependencies import get_db_session, get_current_user
 from app.schemas import ProductCreate, ProductPaginatedResponse, ProductResponse, ProductUpdate
 from datetime import datetime, timezone
 from sqlalchemy import or_
+from typing import Literal
 
 product_router = APIRouter(prefix="/product", tags=["product"])
 
@@ -26,10 +27,17 @@ def search_product(search: str | None = Query(
                    low_stock: bool = Query(default=False, description = "Se verdadeiro, traz os produtos com estoque abaixo do estoque minimo definido daquele produto"),
                    page: int = Query(default = 1, ge= 1, description = "Numero da pagina"),
                    page_size: int = Query(default = 20, ge = 1 , le = 100, description = "Maximo de itens por pagina"),
+                   status_filter: Literal["active", "inactive", "all"] = Query(default="active",
+                    description="Filtro de estado: 'active' (padrão), 'inactive' (desativados) ou 'all' (todos)"),
                    db_session = Depends(get_db_session),
                    current_user = Depends(get_current_user)):
 
-    query = db_session.query(Product).filter(Product.deleted_at.is_(None))
+    query = db_session.query(Product)
+
+    if status_filter == "active":
+        query = query.filter(Product.deleted_at.is_(None))
+    elif status_filter == "inactive":
+        query = query.filter(Product.deleted_at.is_not(None))
 
     if search:
         search_term = f"%{search.strip()}%"
@@ -51,9 +59,12 @@ def search_product(search: str | None = Query(
 
 @product_router.post("/create")
 def create_product(productSchema: ProductCreate, db_session = Depends(get_db_session), current_user = Depends(get_current_user)):
-    conflict_conditions = db_session.query(Product).filter(Product.sku == productSchema.sku, Product.deleted_at.is_(None)).first()
+    conflict_conditions = db_session.query(Product).filter(Product.sku == productSchema.sku).first()
     if conflict_conditions and conflict_conditions.sku == productSchema.sku:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Produto com esse sku já existe")
+        if conflict_conditions.deleted_at is not None:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT,detail=(f"Já existe um produto desativado com este SKU/Código de barras"f"(ID: {conflict_conditions.id}, Nome: '{conflict_conditions.name}'). "f"Restaure o produto existente em vez de criar um novo."))
+        else:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Produto com esse sku já existe")
     #verificando se a categoria existe, acho que fornecedor não é obrigatorio, já que o produto pode existir, mas estar sem um fornecedor no momento
     category = db_session.query(Category).filter(Category.id == productSchema.category_id, Category.deleted_at.is_(None)).first()
     if category is None:
@@ -87,9 +98,12 @@ def modify_product(product_id: int, product_data: ProductUpdate, db_session = De
     update_data = product_data.model_dump(exclude_unset=True)
     new_sku = update_data.get("sku")
     if new_sku:
-        product_data = db_session.query(Product).filter(Product.deleted_at.is_(None), Product.id != product.id, Product.sku == new_sku).first()
-    if(product_data):
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail = "Já existe um produto com esse sku")
+        product_query = db_session.query(Product).filter(Product.id != product.id, Product.sku == new_sku).first()
+        if(product_query):
+            if product_query.deleted_at is None:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail = "Já existe um produto com esse sku")
+            else:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail = f"Já existe um produto com esse sku, porem ele está desativado, para restaurar, envie o ID do produto para a rota de restaurar produto, id do produto {product_query.id}")
     new_category = update_data.get("category_id")
     new_supplier = update_data.get("supplier_id")
     if new_category is not None:
@@ -108,3 +122,40 @@ def modify_product(product_id: int, product_data: ProductUpdate, db_session = De
     db_session.commit()
     db_session.refresh(product)
     return product
+
+@product_router.delete("/delete/{product_id}")
+def delete_product(product_id: int, db_session=Depends(get_db_session), current_user=Depends(get_current_user)):
+    """Exclui um produto do sistema"""
+    product = db_session.query(Product).filter(Product.id == product_id, Product.deleted_at.is_(None)).first()
+    if not product:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Produto não encontrado.")
+    if product.stock_quantity > 0:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Produto ainda tem estoque no sistema, é necessario dar baixa ou ajustar a quantidade dos produtos")
+
+    product.deleted_at = datetime.now(timezone.utc)
+    product.deleted_by = current_user.id
+    db_session.commit()
+    return None
+
+
+@product_router.patch("/restore/{product_id}")
+def restore_product(product_id: int, db_session=Depends(get_db_session), current_user=Depends(get_current_user)):
+    """Restaura um produto do sistema"""
+    product = db_session.query(Product).filter(Product.id == product_id).first()
+    if not product:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Produto não encontrado na lista de inativos.",)
+    elif product.deleted_at is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Produto já esta ativo.")
+
+    product_verify_sku = db_session.query(Product).filter(Product.sku == product.sku, Product.deleted_at.is_(None), Product.id != product_id).first()
+    if product_verify_sku:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Produto com esse SKU já ativo.",)
+
+    product.deleted_at = None
+    product.deleted_by_id = None
+    product.updated_by_id = current_user.id
+
+    db_session.commit()
+    db_session.refresh(product)
+    return product
+
