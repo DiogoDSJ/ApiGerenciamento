@@ -1,5 +1,5 @@
-from pydantic import BaseModel, Field, EmailStr
-from app.models import UserRole
+from pydantic import BaseModel, Field, EmailStr, model_validator
+from app.models import UserRole, MovementType
 from decimal import Decimal
 from datetime import datetime
 
@@ -51,10 +51,39 @@ class TokenSchema(BaseModel):
     token_type: str = "bearer"
 
 
-class StockMovementSchema(BaseModel):
+
+
+class StockMovementCreate(BaseModel):
+    product_id: int = Field(gt=0, examples=[1], description="Id do produto que sofreu movimentacao")
+    movement_type: MovementType = Field(..., examples=["saida"])
+    quantity: int = Field(...,ge=0, description="Quantidade a ser movimentada (para ajuste, representa a quantidade física final ou a variação)", examples=[10])
+    reason: str | None = Field(default=None, max_length=255, examples=["Avaria na embalagem durante transporte"])
+
+    @model_validator(mode="after")
+    def validate_reason_for_critical_movements(self):
+        if(self.movement_type in [MovementType.PERDA, MovementType.AJUSTE]):
+            if not self.reason or self.reason.strip():
+                raise ValueError(f"O campo 'reason' (justificativa) é obrigatório para movimentações do tipo '{self.movement_type.value}'.")
+        return self
+
+    @model_validator(mode="after")
+    def validate_rules(self):
+        if self.movement_type != MovementType.AJUSTE and self.quantity <= 0:
+            raise ValueError(
+                f"A quantidade para '{self.movement_type.value}' deve ser estritamente maior que zero."
+            )
+        return self
+
+class StockMovementResponse(BaseModel):
+    id: int
     product_id: int
+    user_id: int
+    movement_type: MovementType
     quantity: int
-    movement_type: str  # "entrada" ou "saida"
+    reason: str | None
+    created_at: datetime
+    current_product_stock: int  # Saldo do produto após a movimentação
+
     class Config:
         from_attributes = True
 
