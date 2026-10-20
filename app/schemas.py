@@ -213,5 +213,5 @@ class ProductUpdate(BaseModel):
         description="Ponto de pedido / estoque mínimo de segurança",
         examples=[10],
     )
-    category_id: int = Field(..., gt=0, examples=[1])
+    category_id: int | None = Field(default=None, gt=0, examples=[1])
     supplier_id: int | None = Field(default=None, gt=0, examples=[2])
