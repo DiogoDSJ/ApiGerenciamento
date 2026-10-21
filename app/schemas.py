@@ -74,18 +74,38 @@ class StockMovementCreate(BaseModel):
             )
         return self
 
-class StockMovementResponse(BaseModel):
+class StockMovementResponseCreate(BaseModel):
     id: int
     product_id: int
-    user_id: int
     movement_type: MovementType
     quantity: int
     reason: str | None
     created_at: datetime
-    current_product_stock: int  # Saldo do produto após a movimentação
+    current_product_stock: int  # Saldo do produto após a movimentação]
+    created_by: int
 
     class Config:
         from_attributes = True
+
+
+class StockMovementResponseGet(BaseModel):
+    id: int
+    product_id: int
+    movement_type: MovementType
+    quantity: int
+    reason: str | None
+    created_at: datetime
+    created_by: int
+    class Config:
+        from_attributes = True
+
+
+class StockMovementPaginatedResponse(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    product_id: int
+    items: list[StockMovementResponseGet]
 
 class ProductSchema(BaseModel):
     name: str = Field(

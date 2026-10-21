@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from app.models import StockMovement, Product, MovementType
 from app.dependencies import get_db_session, get_current_user
-from app.schemas import ProductSchema, StockMovementCreate, StockMovementResponse
-
+from app.schemas import ProductSchema, StockMovementCreate, StockMovementResponseCreate, StockMovementPaginatedResponse, StockMovementResponseGet
+from datetime import date, timezone, datetime, time
 
 stock_movements_router = APIRouter(prefix="/stock_movement", tags=["stock_movements"])
 
@@ -12,13 +12,48 @@ async def read_stock_movements():
     """Rota raiz do módulo de movimentações de estoque."""
     return {"message": "Bem-vindo ao módulo de movimentações de estoque!"}
 
-@stock_movements_router.get("/list")
-async def return_all_stock_movements():
-    """Retorna todas as movimentações de estoque disponíveis no sistema."""
-    return {"message": "Lista de todas as movimentações de estoque disponíveis."}
+@stock_movements_router.get("/get/{product_id}", response_model=StockMovementPaginatedResponse)
+def return_all_stock_movements_from_a_product(product_id: int,
+                   movement_type: MovementType | None = Query(default = None, description = "Filtrar por tipo: entrada, saida, perda ou ajuste"),
+                   start_date: date | None = Query(default = None, description = "Data inicial da busca"),
+                   end_date: date | None = Query(default=None, description = "Data final da busca"),
+                   page: int = Query(default = 1, ge= 1, description = "Numero da pagina"),
+                   page_size: int = Query(default = 20, ge = 1 , le = 100, description = "Maximo de itens por pagina"),
+                   db_session = Depends(get_db_session),
+                   current_user = Depends(get_current_user)):
+    """Retorna todas as movimentações de estoque de um produto no sistema."""
 
-@stock_movements_router.post("/create", response_model=StockMovementResponse, status_code=status.HTTP_201_CREATED)
-async def create_stock_movement(stock_movement: StockMovementCreate, product_id: int, db_session=Depends(get_db_session), current_user=Depends(get_current_user)):
+    product = db_session.query(Product.id).filter(Product.id == product_id).scalar()
+    if not product:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Produto não encontrado.",)
+
+    query = db_session.query(StockMovement).filter(StockMovement.product_id == product_id)
+
+    if movement_type:
+        query = query.filter(StockMovement.movement_type == movement_type)
+
+    if start_date:
+        start_datetime = datetime.combine(start_date, time.min, tzinfo=timezone.utc)
+        query = query.filter(StockMovement.created_at >= start_datetime)
+
+    if end_date:
+        end_datetime = datetime.combine(end_date, time.max, tzinfo=timezone.utc)
+        query = query.filter(StockMovement.created_at <= end_datetime)
+
+    total = query.count()
+
+    offset = (page - 1) * page_size
+    movements = (
+        query.order_by(StockMovement.created_at.desc())
+        .offset(offset)
+        .limit(page_size)
+        .all()
+    )
+
+    return StockMovementPaginatedResponse(total=total, page=page, page_size=page_size,product_id=product_id, items=movements)
+
+@stock_movements_router.post("/create", response_model=StockMovementResponseCreate, status_code=status.HTTP_201_CREATED)
+def create_stock_movement(stock_movement: StockMovementCreate, product_id: int, db_session=Depends(get_db_session), current_user=Depends(get_current_user)):
     """Cria uma nova movimentação de estoque no sistema."""
     #preciso checar se o produto existe
     product = db_session.query(Product).filter(Product.id == product_id).with_for_update().first()
@@ -47,9 +82,9 @@ async def create_stock_movement(stock_movement: StockMovementCreate, product_id:
     db_session.add(new_stock_movement)
     db_session.commit()
     db_session.refresh(new_stock_movement)
-    return StockMovementResponse(id=new_stock_movement.id,
+    return StockMovementResponseCreate(id=new_stock_movement.id,
         product_id=new_stock_movement.product_id,
-        user_id=new_stock_movement.created_by,
+        created_by=new_stock_movement.created_by,
         movement_type=new_stock_movement.movement_type,
         quantity=new_stock_movement.quantity,
         reason=new_stock_movement.reason,
