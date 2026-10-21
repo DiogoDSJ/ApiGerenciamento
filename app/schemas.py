@@ -35,6 +35,26 @@ class CategorySchema(BaseModel):
     class Config:
         from_attributes = True
 
+class CategoryResponse(BaseModel):
+    id: int
+    name: str
+    created_at: datetime
+    updated_at: datetime | None
+    deleted_at: datetime | None
+
+    created_by: int
+    updated_by: int | None
+    deleted_by: int | None
+
+    class Config:
+        from_attributes = True
+
+class CategoryPaginatedResponse(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    items: list[CategoryResponse]
+
 class LoginSchema(BaseModel):
     username: str = Field(
         min_length=3,
