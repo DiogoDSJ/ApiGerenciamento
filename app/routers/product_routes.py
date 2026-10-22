@@ -141,15 +141,23 @@ def delete_product(product_id: int, db_session=Depends(get_db_session), current_
 @product_router.patch("/restore/{product_id}")
 def restore_product(product_id: int, db_session=Depends(get_db_session), current_user=Depends(get_current_user)):
     """Restaura um produto do sistema"""
-    product = db_session.query(Product).filter(Product.id == product_id).first()
+    product = db_session.query(Product).filter(Product.id == product_id, Product.deleted_at.is_not(None)).first()
     if not product:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Produto não encontrado na lista de inativos.",)
-    elif product.deleted_at is None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Produto já esta ativo.")
-
     product_verify_sku = db_session.query(Product).filter(Product.sku == product.sku, Product.deleted_at.is_(None), Product.id != product_id).first()
     if product_verify_sku:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Produto com esse SKU já ativo.",)
+    category_is_active = (db_session.query(Category.id).filter(Category.id == product.category_id, Category.deleted_at.is_(None)).scalar())
+
+
+    if not category_is_active:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail=(f"Não é possível restaurar o produto '{product.name}': a categoria vinculada "f"(ID: {product.category_id}) está desativada. Reative a categoria antes ou "f"altere a categoria do produto."),)
+
+    # 3. Validação do Fornecedor vinculado (se houver, deve estar ativo)
+    if product.supplier_id is not None:
+        supplier_is_active = (db_session.query(Supplier.id).filter(Supplier.id == product.supplier_id,Supplier.deleted_at.is_(None),).scalar())
+        if not supplier_is_active:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail=(f"Não é possível restaurar o produto '{product.name}': o fornecedor vinculado "f"(ID: {product.supplier_id}) está desativado. Reative o fornecedor antes ou "f"desvincule-o/altere o fornecedor do produto."),)
 
     product.deleted_at = None
     product.deleted_by_id = None
