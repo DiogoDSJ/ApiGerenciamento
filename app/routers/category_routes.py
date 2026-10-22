@@ -14,7 +14,7 @@ def get_category(category_id: int,db_session = Depends(get_db_session),current_u
     if not category:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Produto não encontrado.",
+            detail="Categoria não encontrada.",
         )
     return category
 
@@ -46,7 +46,7 @@ async def create_category(category_data: CategorySchema, db_session=Depends(get_
     """Cria uma nova categoria no sistema."""
     category = db_session.query(Category).filter(Category.name == category_data.name).first()
     if category:
-        if category.Deleted_at is not None:
+        if category.deleted_at is not None:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Categoria já existe.")
         else:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Categoria já existe, porem esta desativada, para usa-la, reative em vez de criar outra, id {category.id}")
@@ -59,7 +59,7 @@ async def create_category(category_data: CategorySchema, db_session=Depends(get_
 def delete_category(category_id: int, db_session=Depends(get_db_session), admin_user=Depends(require_admin)):
     """Exclui uma categoria do sistema."""
     category = db_session.query(Category).filter(Category.id == category_id, Category.deleted_at.is_(None)).first()
-    if not category: # falta ver se ainda tem produto atribuido a categoria, se tiver, não deixa excluir
+    if not category:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Categoria não encontrada.")
     category_check = db_session.query(exists().where(Product.category_id == category_id, Product.deleted_at.is_(None))).scalar()
     if category_check:
@@ -91,7 +91,7 @@ def restore_category(category_id: int, db_session=Depends(get_db_session), admin
     return category
 
 @category_router.patch("/update/{category_id}")
-async def update_category(category_id: int, category_data: CategorySchema, db_session=Depends(get_db_session), current_user=Depends(get_current_user)):
+def update_category(category_id: int, category_data: CategorySchema, db_session=Depends(get_db_session), current_user=Depends(get_current_user)):
     """Atualiza uma categoria existente no sistema."""
     category = db_session.query(Category).filter(Category.id == category_id).first()
     if not category: # Olha se a categoria existe, se não existir, não deixa atualizar e tambem falta verificar se a categoria tem produtos vinculados, se tiver, não deixa atualizar
