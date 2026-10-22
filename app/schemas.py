@@ -1,4 +1,5 @@
-from pydantic import BaseModel, Field, EmailStr, model_validator
+import re
+from pydantic import BaseModel, Field, EmailStr, field_validator, model_validator
 from app.models import UserRole, MovementType
 from decimal import Decimal
 from datetime import datetime
@@ -199,7 +200,7 @@ class SupplierSchema(BaseModel):
     )
     cnpj: str = Field(
         ...,
-        pattern=r"^\d{2}\.?\d{3}\.?\d{3}/?\d{4}-?\d{2}$|^\d{14}$",
+        pattern=r"^\d{14}$",
         description="CNPJ da empresa (com ou sem máscara)",
         examples=["12.345.678/0001-90", "12345678000190"],
     )
@@ -216,13 +217,50 @@ class SupplierSchema(BaseModel):
         max_length=120,
         description="Endereco do fornecedor"
     )
-
+    @field_validator("cnpj", mode="before")
+    @classmethod
+    def normalize_cnpj(cls, v: str) -> str:
+        if isinstance(v, str):
+            # Remove qualquer caractere que não seja dígito
+            v = re.sub(r"\D", "", v)
+        return v
+    @field_validator("phone", mode="before")
+    @classmethod
+    def normalize_phone(cls, v: str) -> str:
+        if isinstance(v, str):
+            # Remove qualquer caractere que não seja dígito
+            v = re.sub(r"\D", "", v)
+        return v
     class Config:
         from_attributes = True
 
 class RefreshTokenRequest(BaseModel):
     refresh_token: str
 
+class SupplierResponse(BaseModel):
+    id: int
+    name: str
+    cnpj: str
+    email: str
+    phone: str
+    address: str
+
+    created_at: datetime
+    updated_at: datetime | None
+    deleted_at: datetime | None
+
+    created_by: int
+    updated_by: int | None
+    deleted_by: int | None
+
+    class Config:
+        from_attributes = True
+
+class SupplierPaginatedResponse(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    items: list[SupplierResponse]
 
 class ProductResponse(BaseModel):
     id: int
