@@ -8,7 +8,7 @@ stock_movements_router = APIRouter(prefix="/stock_movement", tags=["stock_moveme
 
 
 @stock_movements_router.get("/")
-async def read_stock_movements():
+def read_stock_movements():
     """Rota raiz do módulo de movimentações de estoque."""
     return {"message": "Bem-vindo ao módulo de movimentações de estoque!"}
 

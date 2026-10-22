@@ -42,7 +42,7 @@ def search_category(search: str | None = Query(default = None, description = "Bu
     return CategoryPaginatedResponse(total=total, page=page, page_size=page_size, items=categorys)
 
 @category_router.post("/create")
-async def create_category(category_data: CategorySchema, db_session=Depends(get_db_session), current_user=Depends(get_current_user)):
+def create_category(category_data: CategorySchema, db_session=Depends(get_db_session), current_user=Depends(get_current_user)):
     """Cria uma nova categoria no sistema."""
     category = db_session.query(Category).filter(Category.name == category_data.name).first()
     if category:

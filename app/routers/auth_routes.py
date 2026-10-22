@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
 
 @auth_router.get("/")
-async def read_root():
+def read_root():
     """Rota raiz do módulo de autenticação."""
     return {"message": "Bem-vindo ao módulo de autenticação!"}
 
@@ -38,7 +38,7 @@ def authenticate_user(username, password, db_session):
     return user
 
 @auth_router.post("/create_user")
-async def create_user(user_data: UserSchema, db_session=Depends(get_db_session)):
+def create_user(user_data: UserSchema, db_session=Depends(get_db_session)):
     """Cria um novo usuário no sistema."""
     user = db_session.query(User).filter((User.username == user_data.username), User.deleted_at.is_(None)).first()
     if user:
@@ -51,7 +51,7 @@ async def create_user(user_data: UserSchema, db_session=Depends(get_db_session))
         raise HTTPException(status_code=status.HTTP_201_CREATED, detail=f"Usuário criado com sucesso. {user_data.email} {user_data.username} {user_data.role}")
 
 @auth_router.post("/login")
-async def login(loginSchema: LoginSchema = Depends(), db_session=Depends(get_db_session)):
+def login(loginSchema: LoginSchema = Depends(), db_session=Depends(get_db_session)):
     """Autentica um usuário no sistema."""
     user = authenticate_user(loginSchema.username, loginSchema.password, db_session)
     token = create_acess_token(user.username)

@@ -10,7 +10,7 @@ user_router = APIRouter(prefix="/users", tags=["users"])
 
 
 @user_router.get("/")
-async def read_root():
+def read_root():
     """Rota raiz da rota de usuario"""
     return {"message": "Bem-vindo ao módulo de usuarios!"}
 
