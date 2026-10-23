@@ -50,6 +50,14 @@ class UserAlreadyExistsException(ConflictException):
             details={"username": username},
         )
 
+class EmailAlreadyExistsException(ConflictException):
+    error_code = "USER_ALREADY_EXISTS"
+
+    def __init__(self, email: str):
+        super().__init__(
+            message=f"Já existe um usuário cadastrado com o email '{email}'.",
+            details={"email": email},
+        )
 
 class UserNotFoundException(NotFoundException):
     error_code = "USER_NOT_FOUND"
@@ -60,9 +68,7 @@ class UserNotFoundException(NotFoundException):
             details={"identifier": identifier},
         )
 
-class InvalidCredentialsException(AppException):
-    status_code = 401
-    error_code = "INVALID_CREDENTIALS"
+class InvalidCredentialsException(AuthenticationException):
     message = "Credenciais inválidas ou token expirado."
 
     def __init__(

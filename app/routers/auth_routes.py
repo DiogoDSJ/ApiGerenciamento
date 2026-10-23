@@ -5,8 +5,8 @@ from app.security import bcrypt_context, algorithm, token_expire_minutes, secret
 from app.schemas import UserSchema, LoginSchema, RefreshTokenRequest, APIResponse, RefreshTokenResponse, TokenSchema
 from jose import jwt, JWTError
 from datetime import datetime, timedelta, timezone
-from app.exceptions import AuthenticationException, UserAlreadyExistsException, UserNotFoundException
-
+from app.exceptions import AuthenticationException, UserAlreadyExistsException, UserNotFoundException, EmailAlreadyExistsException
+from sqlalchemy import or_
 
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -39,9 +39,12 @@ def authenticate_user(username, password, db_session):
 @auth_router.post("/create_user", response_model = APIResponse[UserSchema], status_code=status.HTTP_201_CREATED)
 def create_user(user_data: UserSchema, db_session=Depends(get_db_session)):
     """Cria um novo usuário no sistema."""
-    user = db_session.query(User).filter((User.username == user_data.username), User.deleted_at.is_(None)).first()
+    user = db_session.query(User).filter(or_(User.username == user_data.username, User.email == user_data.email), User.deleted_at.is_(None)).first()
     if user:
-        raise UserAlreadyExistsException(username=user_data.username)
+        if user_data.username == user.username:
+            raise UserAlreadyExistsException(username=user_data.username)
+        elif user_data.email == user.email:
+            raise EmailAlreadyExistsException(email=user_data.email)
     else:
         encrypted_password = bcrypt_context.hash(user_data.password)
         new_user = User(username=user_data.username, password=encrypted_password, email=user_data.email, role=user_data.role)
