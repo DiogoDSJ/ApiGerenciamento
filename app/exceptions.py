@@ -40,6 +40,10 @@ class AuthenticationException(AppException):
     error_code = "INVALID_CREDENTIALS"
     message = "Nome de usuário ou senha incorretos."
 
+class BusinessRuleException(AppException):
+    status_code = 400
+    error_code = "BUSINESS_RULE_VIOLATION"
+    message = "A operação viola uma regra de negócio do sistema."
 
 class UserAlreadyExistsException(ConflictException):
     error_code = "USER_ALREADY_EXISTS"
@@ -58,6 +62,7 @@ class EmailAlreadyExistsException(ConflictException):
             message=f"Já existe um usuário cadastrado com o email '{email}'.",
             details={"email": email},
         )
+
 
 class UserNotFoundException(NotFoundException):
     error_code = "USER_NOT_FOUND"
@@ -111,4 +116,31 @@ class InsufficientPermision(AppException):
         super().__init__(
             message=message or self.message,
             details=details,
+        )
+
+class CategoryNotFoundException(NotFoundException):
+    error_code = "CATEGORY_NOT_FOUND"
+
+    def __init__(self, identifier: int):
+        super().__init__(
+            message=f"Categoria de id '{identifier}' não foi encontrada",
+            details={"identifier": identifier},
+        )
+
+class CategoryAlreadyExistsException(ConflictException):
+    error_code = "CATEGORY_ALREADY_EXISTS"
+
+    def __init__(self, category_name: str, category_id: int):
+        super().__init__(
+            message=f"Já existe um categoria cadastrada com esse nome, seu nome: {category_name} id: {category_id}",
+            details={"category_name": category_name, "category_id": category_id},
+        )
+
+class CategoryHasProductsExcetion(ConflictException):
+    error_code = "CATEGORY_STILL_HAS_PRODUCTS"
+
+    def __init__(self, category: str):
+        super().__init__(
+            message=f"A categoria {category} tem produtos ativos anexados, desative-os primeiros para desativa-la ",
+            details={"category": category},
         )

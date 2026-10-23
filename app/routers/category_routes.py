@@ -1,24 +1,22 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from app.models import Category, Product
 from app.dependencies import get_db_session, get_current_user, require_admin
-from app.schemas import CategorySchema, CategoryPaginatedResponse
+from app.schemas import CategorySchema, CategoryPaginatedResponse, APIResponse, CategoryResponse
 from sqlalchemy import exists, func, or_
 from datetime import datetime, timezone
 from typing import Literal
+from app.exceptions import CategoryNotFoundException, CategoryAlreadyExistsException, CategoryHasProductsExcetion
 
 category_router = APIRouter(prefix="/category", tags=["category"])
 
-@category_router.get("/{category_id}")
+@category_router.get("/{category_id}", response_model=APIResponse[CategoryResponse])
 def get_category(category_id: int,db_session = Depends(get_db_session),current_user = Depends(get_current_user)):
     category = (db_session.query(Category).filter(Category.id == category_id).first())
     if not category:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Categoria não encontrada.",
-        )
-    return category
+        raise CategoryNotFoundException(identifier=category_id)
+    return APIResponse(message="Categoria encontrada com sucesso", data = category)
 
-@category_router.get("")
+@category_router.get("", response_model=APIResponse[CategoryPaginatedResponse])
 def search_category(search: str | None = Query(default = None, description = "Busca por nome de categoria"),
                               status_filter: Literal["active", "inactive", "all"] = Query(default="active", description="Filtro de estado: 'active' (padrão), 'inactive' (desativados) ou 'all' (todos)"),
                               db_session=Depends(get_db_session),
@@ -39,47 +37,43 @@ def search_category(search: str | None = Query(default = None, description = "Bu
 
     offset = (page - 1) * page_size
     categorys = query.order_by(Category.name.asc()).offset(offset).limit(page_size).all()
-    return CategoryPaginatedResponse(total=total, page=page, page_size=page_size, items=categorys)
+    return APIResponse(message = "Abaixo estao o resultado da busca que foi concluida", data=CategoryPaginatedResponse(total=total, page=page, page_size=page_size, items=categorys))
 
-@category_router.post("/create")
+@category_router.post("/create", response_model=APIResponse[CategoryResponse])
 def create_category(category_data: CategorySchema, db_session=Depends(get_db_session), current_user=Depends(get_current_user)):
     """Cria uma nova categoria no sistema."""
     category = db_session.query(Category).filter(Category.name == category_data.name).first()
     if category:
-        if category.deleted_at is not None:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Categoria já existe.")
-        else:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Categoria já existe, porem esta desativada, para usa-la, reative em vez de criar outra, id {category.id}")
+        raise CategoryAlreadyExistsException(category_name=category.name, category_id=category.id)
     new_category = Category(name=category_data.name, created_by=current_user.id)
     db_session.add(new_category)
     db_session.commit()
-    raise HTTPException(status_code=status.HTTP_201_CREATED, detail=f"Categoria criada com sucesso. {category_data.name} por {current_user.username}")
+    return APIResponse(message="Categoria criada com sucesso", data = new_category)
 
-@category_router.delete("/delete/{category_id}")
+@category_router.delete("/delete/{category_id}", response_model=APIResponse[CategoryResponse])
 def delete_category(category_id: int, db_session=Depends(get_db_session), admin_user=Depends(require_admin)):
     """Exclui uma categoria do sistema."""
     category = db_session.query(Category).filter(Category.id == category_id, Category.deleted_at.is_(None)).first()
     if not category:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Categoria não encontrada.")
+        raise CategoryNotFoundException(identifier=category_id)
     category_check = db_session.query(exists().where(Product.category_id == category_id, Product.deleted_at.is_(None))).scalar()
     if category_check:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nao é possivel deletar essa categoria, pois tem produtos ativos anexados a ela.")
+        raise CategoryHasProductsExcetion(category=category.name)
     # Aqui eu aplico um soft delete, para que o sistema saiba quem foi o usuario que removeu
     category.deleted_at = datetime.now(timezone.utc)
     category.deleted_by = admin_user.id  # Supondo que você tenha uma forma de obter o usuário atual
     db_session.commit()
-    raise HTTPException(status_code=status.HTTP_200_OK, detail=f"Categoria excluída com sucesso. {category.name} usuario que removeu: {admin_user.username}")
+    return APIResponse(message="Categoria desativada com sucesso", data = category)
 
-@category_router.patch("/restore/{category_id}")
+@category_router.patch("/restore/{category_id}", response_model=APIResponse[CategoryResponse])
 def restore_category(category_id: int, db_session=Depends(get_db_session), admin_user=Depends(require_admin)):
     """Reativa uma categoria do sistema."""
     category = db_session.query(Category).filter(Category.id == category_id, Category.deleted_at.is_not(None)).first()
     if not category: # falta ver se ainda tem produto atribuido a categoria, se tiver, não deixa excluir
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Categoria não encontrada para restauracao")
-
+        raise CategoryNotFoundException(identifier=category_id)
     collision = (db_session.query(Category).filter(Category.id != category.id,Category.deleted_at.is_(None),func.lower(Category.name) == category.name.lower().strip(),).first())
     if collision:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT,detail=(f"Não é possível restaurar: já existe uma categoria ativa com o nome "f"'{collision.name}' (ID: {collision.id})."),)
+        raise CategoryAlreadyExistsException(category_name=category.name, category_id=category.id)
 
     category.deleted_at = None
     category.deleted_by_id = None
@@ -88,20 +82,21 @@ def restore_category(category_id: int, db_session=Depends(get_db_session), admin
     db_session.commit()
     db_session.refresh(category)
 
-    return category
+    return APIResponse(message="Categoria restaurada com sucesso", data = category)
 
-@category_router.patch("/update/{category_id}")
+
+@category_router.patch("/update/{category_id}", response_model=APIResponse[CategoryResponse])
 def update_category(category_id: int, category_data: CategorySchema, db_session=Depends(get_db_session), current_user=Depends(get_current_user)):
     """Atualiza uma categoria existente no sistema."""
     category = db_session.query(Category).filter(Category.id == category_id).first()
     if not category: # Olha se a categoria existe, se não existir, não deixa atualizar e tambem falta verificar se a categoria tem produtos vinculados, se tiver, não deixa atualizar
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Categoria não encontrada.")
+        raise CategoryNotFoundException(identifier=category_id)
     #preciso verificar se o nome novo nao ja existe
     new_name = db_session.query(Category).filter(Category.name == category_data.name).first()
     if new_name is not None:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ja existe uma categoria com esse nome")
+        raise CategoryAlreadyExistsException(category_name=category.name, category_id=category.id)
     category.name = category_data.name
     category.updated_at = datetime.now(timezone.utc)
     category.updated_by = current_user.id  # Supondo que você tenha uma forma de obter o usuário atual
     db_session.commit()
-    raise HTTPException(status_code=status.HTTP_200_OK, detail=f"Categoria atualizada com sucesso. {category.name} usuario que atualizou: {current_user.username}")
+    return APIResponse(message="Categoria atualizada com sucesso", data = category)
