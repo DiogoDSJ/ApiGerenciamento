@@ -1,8 +1,12 @@
 import re
-from pydantic import BaseModel, Field, EmailStr, field_validator, model_validator
+from pydantic import BaseModel, Field, EmailStr, field_validator, model_validator, BaseModel, Field
 from app.models import UserRole, MovementType
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, timezone
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
 
 class UserSchema(BaseModel):
     username: str = Field(
@@ -338,3 +342,18 @@ class ProductUpdate(BaseModel):
     )
     category_id: int | None = Field(default=None, gt=0, examples=[1])
     supplier_id: int | None = Field(default=None, gt=0, examples=[2])
+
+
+
+class APIResponse(BaseModel, Generic[T]):
+    success: bool = True
+    message: str = "Operação realizada com sucesso."
+    data: T
+    timestamp: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc)
+    )
+
+class RefreshTokenResponse(BaseModel):
+    acess_token: str
+    token_type: str = "bearer"
+

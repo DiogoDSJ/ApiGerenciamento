@@ -1,7 +1,11 @@
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
-
+from app.error_handlers import (
+    app_exception_handler,
+    validation_exception_handler,
+)
+from app.exceptions import AppException
 
 app = FastAPI(title="API Estoque")
 
@@ -14,35 +18,8 @@ TRANSLATIONS = {
 }
 
 
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(
-    request: Request, exc: RequestValidationError
-):
-    errors = {}
-
-    for err in exc.errors():
-        # Extrai o nome do campo (último elemento de loc, ignorando 'body')
-        field_name = err["loc"][-1] if err["loc"] else "geral"
-        err_type = err["type"]
-        ctx = err.get("ctx", {})
-
-        # Usa mensagem customizada do field_validator se houver
-        if err_type == "value_error" and "Value error, " in err["msg"]:
-            msg = err["msg"].replace("Value error, ", "")
-        elif err_type in TRANSLATIONS:
-            msg = TRANSLATIONS[err_type].format(**ctx)
-        else:
-            msg = err["msg"]
-
-        errors[str(field_name)] = msg
-
-    return JSONResponse(
-        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-        content={
-            "message": "Erro de validação nos campos informados.",
-            "errors": errors,
-        },
-    )
+app.add_exception_handler(AppException, app_exception_handler)
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
 
 
 from app.routers.category_routes import category_router
