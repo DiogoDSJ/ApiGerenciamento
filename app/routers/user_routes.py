@@ -30,7 +30,7 @@ def get_specific_user(user_id: int, db_session = Depends(get_db_session), admin_
     if user_id is not None:
         user = db_session.query(User).filter(User.id == user_id).first()
         if user:
-            return user
+            return APIResponse(message="Informacoes do usuario obtida com sucesso", data=user)
         else:
             raise UserNotFoundException(identifier=str(user_id))
     else:
