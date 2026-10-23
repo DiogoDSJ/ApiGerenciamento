@@ -136,7 +136,7 @@ class CategoryAlreadyExistsException(ConflictException):
             details={"category_name": category_name, "category_id": category_id},
         )
 
-class CategoryHasProductsExcetion(ConflictException):
+class CategoryHasProductsException(ConflictException):
     error_code = "CATEGORY_STILL_HAS_PRODUCTS"
 
     def __init__(self, category: str):
@@ -144,3 +144,9 @@ class CategoryHasProductsExcetion(ConflictException):
             message=f"A categoria {category} tem produtos ativos anexados, desative-os primeiros para desativa-la ",
             details={"category": category},
         )
+
+class AdminCantDeleteHimselfException(BusinessRuleException):
+    message = "Você não pode excluir sua própria conta de administrador."
+
+class AdminCantRevogateHimselfException(BusinessRuleException):
+    message = "Você não pode tirar seus direitos de administrador."

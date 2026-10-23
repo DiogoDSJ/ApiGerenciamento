@@ -5,7 +5,7 @@ from app.schemas import CategorySchema, CategoryPaginatedResponse, APIResponse, 
 from sqlalchemy import exists, func, or_
 from datetime import datetime, timezone
 from typing import Literal
-from app.exceptions import CategoryNotFoundException, CategoryAlreadyExistsException, CategoryHasProductsExcetion
+from app.exceptions import CategoryNotFoundException, CategoryAlreadyExistsException, CategoryHasProductsException
 
 category_router = APIRouter(prefix="/category", tags=["category"])
 
@@ -58,7 +58,7 @@ def delete_category(category_id: int, db_session=Depends(get_db_session), admin_
         raise CategoryNotFoundException(identifier=category_id)
     category_check = db_session.query(exists().where(Product.category_id == category_id, Product.deleted_at.is_(None))).scalar()
     if category_check:
-        raise CategoryHasProductsExcetion(category=category.name)
+        raise CategoryHasProductsException(category=category.name)
     # Aqui eu aplico um soft delete, para que o sistema saiba quem foi o usuario que removeu
     category.deleted_at = datetime.now(timezone.utc)
     category.deleted_by = admin_user.id  # Supondo que você tenha uma forma de obter o usuário atual
