@@ -109,24 +109,40 @@ class StockMovementResponseCreate(BaseModel):
         from_attributes = True
 
 
-class StockMovementResponseGet(BaseModel):
+class EntitySummary(BaseModel):
     id: int
-    product_id: int
-    movement_type: MovementType
-    quantity: int
-    reason: str | None
-    created_at: datetime
-    created_by: int
+    name: str
+    supplier_id: int | None
+    category_id: int
+
     class Config:
         from_attributes = True
 
 
-class StockMovementPaginatedResponse(BaseModel):
+class UserSummary(BaseModel):
+    id: int
+    username: str
+
+    class Config:
+        from_attributes = True
+
+class StockMovementResponseGetSpecific(BaseModel):
+    id: int
+    product_id: int
+    product: EntitySummary
+    movement_type: MovementType
+    quantity: int
+    reason: str | None
+    created_at: datetime
+    created_by: UserSummary = Field(validation_alias="user")
+    class Config:
+        from_attributes = True
+
+class StockMovementPaginatedResponseGet(BaseModel):
     total: int
     page: int
     page_size: int
-    product_id: int
-    items: list[StockMovementResponseGet]
+    items: list[StockMovementResponseGetSpecific]
 
 class ProductSchema(BaseModel):
     name: str = Field(

@@ -1,18 +1,96 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from app.models import StockMovement, Product, MovementType
 from app.dependencies import get_db_session, get_current_user
-from app.schemas import ProductSchema, StockMovementCreate, StockMovementResponseCreate, StockMovementPaginatedResponse, StockMovementResponseGet
+from sqlalchemy.orm import joinedload
+from app.schemas import ProductSchema, StockMovementCreate, StockMovementResponseCreate, StockMovementPaginatedResponseGet
 from datetime import date, timezone, datetime, time
+from typing import Literal
 
 stock_movements_router = APIRouter(prefix="/stock_movement", tags=["stock_movements"])
 
 
-@stock_movements_router.get("/")
-def read_stock_movements():
-    """Rota raiz do módulo de movimentações de estoque."""
-    return {"message": "Bem-vindo ao módulo de movimentações de estoque!"}
+@stock_movements_router.get("", response_model=StockMovementPaginatedResponseGet)
+def list_stock_movements(
+    product_id: int | None = Query(
+        default=None, description="Filtra por um produto específico"
+    ),
+    supplier_id: int | None = Query(
+        default=None,
+        description="Filtra por movimentações de produtos de um fornecedor",
+    ),
+    user_id: int | None = Query(
+        default=None, description="Filtra pelo usuário que realizou a operação"
+    ),
+    movement_type: Literal["ENTRADA", "SAIDA", "PERDA", "AJUSTE"] | None = Query(
+        default=None, description="Tipo de movimentação física"
+    ),
+    start_date: date | None = Query(
+        default=None, description="Data inicial do intervalo (AAAA-MM-DD)"
+    ),
+    end_date: date | None = Query(
+        default=None, description="Data final do intervalo (AAAA-MM-DD)"
+    ),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    db_session = Depends(get_db_session),
+    current_user = Depends(get_current_user),
+):
+    """Retorna o extrato de movimentações de estoque com filtros combinados."""
+    # O joinedload elimina o problema de N+1 queries trazendo produto e usuário no mesmo select
+    query = db_session.query(StockMovement).options(
+        joinedload(StockMovement.product),
+        joinedload(StockMovement.user),
+    )
 
-@stock_movements_router.get("/get/{product_id}", response_model=StockMovementPaginatedResponse)
+    # 1. Filtro por Produto
+    if product_id is not None:
+        query = query.filter(StockMovement.product_id == product_id)
+
+    # 2. Filtro por Fornecedor (exige JOIN com Product)
+    if supplier_id is not None:
+        query = query.join(StockMovement.product).filter(
+            Product.supplier_id == supplier_id
+        )
+
+    # 3. Filtro por Usuário que executou
+    if user_id is not None:
+        query = query.filter(StockMovement.user_id == user_id)
+
+    # 4. Filtro por Tipo de Operação
+    if movement_type is not None:
+        query = query.filter(StockMovement.movement_type == movement_type)
+
+    # 5. Filtros Temporais (convertendo date para limites de timestamp UTC)
+    if start_date is not None:
+        start_datetime = datetime.combine(
+            start_date, time.min, tzinfo=timezone.utc
+        )
+        query = query.filter(StockMovement.created_at >= start_datetime)
+
+    if end_date is not None:
+        end_datetime = datetime.combine(end_date, time.max, tzinfo=timezone.utc)
+        query = query.filter(StockMovement.created_at <= end_datetime)
+
+    # Contagem total antes de paginar
+    total = query.count()
+
+    # Ordenação estrita: mais recentes primeiro (LIFO)
+    offset = (page - 1) * page_size
+    movements = (
+        query.order_by(StockMovement.created_at.desc(), StockMovement.id.desc())
+        .offset(offset)
+        .limit(page_size)
+        .all()
+    )
+
+    return StockMovementPaginatedResponseGet(
+        total=total,
+        page=page,
+        page_size=page_size,
+        items=movements,
+    )
+
+@stock_movements_router.get("/get/{product_id}", response_model=StockMovementPaginatedResponseGet)
 def return_all_stock_movements_from_a_product(product_id: int,
                    movement_type: MovementType | None = Query(default = None, description = "Filtrar por tipo: entrada, saida, perda ou ajuste"),
                    start_date: date | None = Query(default = None, description = "Data inicial da busca"),
@@ -50,7 +128,7 @@ def return_all_stock_movements_from_a_product(product_id: int,
         .all()
     )
 
-    return StockMovementPaginatedResponse(total=total, page=page, page_size=page_size,product_id=product_id, items=movements)
+    return StockMovementPaginatedResponseGet(total=total, page=page, page_size=page_size, items=movements)
 
 @stock_movements_router.post("/create", response_model=StockMovementResponseCreate, status_code=status.HTTP_201_CREATED)
 def create_stock_movement(stock_movement: StockMovementCreate, product_id: int, db_session=Depends(get_db_session), current_user=Depends(get_current_user)):
