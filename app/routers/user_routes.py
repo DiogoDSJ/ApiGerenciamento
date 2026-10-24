@@ -2,10 +2,10 @@ from fastapi import APIRouter, Depends, Query, HTTPException, status
 from app.models import User, UserRole
 from app.dependencies import get_current_user, require_admin, get_db_session
 from app.schemas import UserSchema, UserUpdate, APIResponse, UserPaginatedResponse, UserResponse
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 from datetime import datetime, timezone
 from app.security import bcrypt_context
-from app.exceptions import UserNotFoundException, AdminCantDeleteHimselfException, AdminCantRevogateHimselfException, UserAlreadyExistsException, EmailAlreadyExistsException
+from app.exceptions import UserNotFoundException, AdminCantDeleteHimselfException, AdminCantRevogateHimselfException, UserAlreadyExistsException, EmailAlreadyExistsException, UserRestoreConflictException
 from typing import Literal
 
 user_router = APIRouter(prefix="/users", tags=["users"])
@@ -40,7 +40,7 @@ def get_all_users(search: str | None = Query(default = None, description = "Busc
     users = query.order_by(User.username.asc()).offset(offset).limit(page_size).all()
     return APIResponse(message="Busca concluida com sucesso", data=UserPaginatedResponse(total=total, page=page, page_size=page_size, items=users))
 
-@user_router.get("/search/{user_id}", response_model=APIResponse[UserSchema])
+@user_router.get("/search/{user_id}", response_model=APIResponse[UserResponse])
 def get_specific_user(user_id: int, db_session = Depends(get_db_session), admin_user = Depends(require_admin)):
     """Retorna informacao de um usuario especifico"""
     if user_id is not None:
@@ -114,3 +114,23 @@ def change_user_password(user_id : int, new_password : str, db_session = Depends
 
     db_session.commit()
     return APIResponse(message="Alteracao de senha feita com sucesso", data=None)
+
+@user_router.patch("/restore/{user_id}", response_model = APIResponse[UserResponse])
+def restore_user(user_id, db_session= Depends(get_db_session), admin_user = Depends(require_admin)):
+    user = db_session.query(User).filter(User.id == user_id, User.deleted_at.is_not(None)).first()
+    if not user:
+        raise UserNotFoundException(identifier=user_id)
+
+    conflicts = (db_session.query(User).filter(User.id != user_id, or_(User.email == user.email,func.lower(User.username) == user.username.strip().lower(),),).all())
+    if conflicts:
+        details = [f"ID {c.id} ({c.username})" for c in conflicts]
+        raise UserRestoreConflictException(conflicting_users=details)
+
+    user.deleted_at = None
+    user.deleted_by = None
+    user.updated_by = admin_user.id
+
+    db_session.commit()
+    db_session.refresh(user)
+
+    return APIResponse(message="Usuario ativado com sucesso", data = user)
