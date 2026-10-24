@@ -1,11 +1,12 @@
 from fastapi import APIRouter, Depends, Query, HTTPException, status
 from app.models import User, UserRole
 from app.dependencies import get_current_user, require_admin, get_db_session
-from app.schemas import UserSchema, UserUpdate, APIResponse
+from app.schemas import UserSchema, UserUpdate, APIResponse, UserPaginatedResponse, UserResponse
 from sqlalchemy import or_
 from datetime import datetime, timezone
 from app.security import bcrypt_context
 from app.exceptions import UserNotFoundException, AdminCantDeleteHimselfException, AdminCantRevogateHimselfException, UserAlreadyExistsException, EmailAlreadyExistsException
+from typing import Literal
 
 user_router = APIRouter(prefix="/users", tags=["users"])
 
@@ -14,15 +15,30 @@ user_router = APIRouter(prefix="/users", tags=["users"])
 def read_root():
     """Rota raiz da rota de usuario"""
     return {"message": "Bem-vindo ao módulo de usuarios!"}
-#preciso arruamr esse get all
-@user_router.get("/all")
-def get_all_users(skip:int=0, limit:int = 100, include_deleted: bool = Query(False, description="Se verdadeiro, inclui usuários inativados/excluídos via soft delete"), db_session=Depends(get_db_session), admin_user=Depends(require_admin )):
+
+@user_router.get("/all", response_model=APIResponse[UserPaginatedResponse])
+def get_all_users(search: str | None = Query(default = None, description = "Busca por nome de fornecedor, cnpj, email ou telefone"),
+                  page: int = Query(default = 1, ge= 1, description = "Numero da pagina"),
+                      user_type: Literal["ADMIN", "FUNCIONARIO"] | None = Query(default=None, description="Tipo de usuario"),
+                              page_size: int = Query(default = 20, ge = 1 , le = 100, description = "Maximo de itens por pagina"),
+                             status_filter: Literal["active", "inactive", "all"] = Query(default="active", description="Filtro de estado: 'active' (padrão), 'inactive' (desativados) ou 'all' (todos)"),
+                             db_session=Depends(get_db_session),
+                             admin_user=Depends(require_admin )):
     """Retorna todas os usuarios disponíveis no sistema. deletados? sim ou nao"""
-    if include_deleted is False:
-        users = (db_session.query(User).filter(User.deleted_at.is_(None)).offset(skip).limit(limit).all())
-    else:
-        users = (db_session.query(User).offset(skip).limit(limit).all())
-    return users
+    query = db_session.query(User)
+    if status_filter== "active":
+        query = query.filter(User.deleted_at.is_(None))
+    elif status_filter == "inactive":
+        query = query.filter(User.deleted_at.is_not(None))
+    if search:
+        search_term = f"%{search.strip()}%"
+        query = query.filter(or_(User.username.ilike(search_term), User.email.ilike(search_term)))
+    if user_type is not None:
+        query = query.filter(User.role == user_type)
+    total = query.count()
+    offset = (page - 1) * page_size
+    users = query.order_by(User.username.asc()).offset(offset).limit(page_size).all()
+    return APIResponse(message="Busca concluida com sucesso", data=UserPaginatedResponse(total=total, page=page, page_size=page_size, items=users))
 
 @user_router.get("/search/{user_id}", response_model=APIResponse[UserSchema])
 def get_specific_user(user_id: int, db_session = Depends(get_db_session), admin_user = Depends(require_admin)):
@@ -36,7 +52,7 @@ def get_specific_user(user_id: int, db_session = Depends(get_db_session), admin_
     else:
         raise UserNotFoundException(identifier=str(user_id))
 
-@user_router.patch("/update/{user_id}", response_model=APIResponse[UserSchema])
+@user_router.patch("/update/{user_id}", response_model=APIResponse[UserResponse])
 def modify_user(user_id: int, userUpdate: UserUpdate, db_session = Depends(get_db_session), admin_user = Depends(require_admin)):
     """Modifica um usuario"""
     user = db_session.query(User).filter(User.id == user_id, User.deleted_at.is_(None)).first()
@@ -74,7 +90,7 @@ def modify_user(user_id: int, userUpdate: UserUpdate, db_session = Depends(get_d
     return APIResponse(message="Usuario atualizado com sucesso", data=user)
 
 
-@user_router.delete("/delete/{user_id}", response_model=APIResponse[UserSchema])
+@user_router.delete("/delete/{user_id}", response_model=APIResponse[UserResponse])
 def delete_user(user_id : int, db_session = Depends(get_db_session), admin_user = Depends(require_admin)):
     if user_id == admin_user.id:
         raise AdminCantDeleteHimselfException

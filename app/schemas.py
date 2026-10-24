@@ -257,6 +257,23 @@ class SupplierSchema(BaseModel):
 class RefreshTokenRequest(BaseModel):
     refresh_token: str
 
+class UserResponse(BaseModel):
+    id: int
+    username: str
+    email: str
+    role: str
+
+    created_at: datetime
+    updated_at: datetime | None
+    deleted_at: datetime | None
+
+    created_by: int | None
+    updated_by: int | None
+    deleted_by: int | None
+
+    class Config:
+        from_attributes = True
+
 class SupplierResponse(BaseModel):
     id: int
     name: str
@@ -281,6 +298,12 @@ class SupplierPaginatedResponse(BaseModel):
     page: int
     page_size: int
     items: list[SupplierResponse]
+
+class UserPaginatedResponse(BaseModel):
+    total: int
+    page: int
+    page_size: int
+    items: list[UserResponse]
 
 class ProductResponse(BaseModel):
     id: int
