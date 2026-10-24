@@ -10,14 +10,29 @@ T = TypeVar("T")
 
 class UserSchema(BaseModel):
     username: str = Field(
+        ...,
         min_length=3,
         max_length=50,
-        pattern=r"^\S+$",  # Impede qualquer espaço em branco (inclusive string vazia "")
-        description="Nome de usuário sem espaços"
+        pattern=r"^\S+$",
+        examples=["operador_estoque"],
+        description="Nome de usuário sem espaços",
     )
-    password: str
-    email: EmailStr
-    role: UserRole
+    password: str = Field(
+        ...,
+        min_length=6,
+        examples=["SenhaForte@2026"],
+        description="Senha de acesso ao sistema",
+    )
+    email: EmailStr = Field(
+        ...,
+        examples=["operador@erp.com.br"],
+        description="E-mail do colaborador",
+    )
+    role: UserRole = Field(
+        ...,
+        examples=["funcionario"],
+        description="Perfil de acesso: 'admin' ou 'funcionario'",
+    )
 
     class Config:
         from_attributes = True
@@ -35,7 +50,11 @@ class UserUpdate(BaseModel):
 
 class CategorySchema(BaseModel):
     name: str = Field(
-        min_length=2, max_length=150, description="Nome da categoria"
+        ...,
+        min_length=2,
+        max_length=150,
+        examples=["Componentes Eletrônicos"],
+        description="Nome descritivo da categoria",
     )
     class Config:
         from_attributes = True
@@ -200,42 +219,87 @@ class ProductCreate(BaseModel):
         ...,
         min_length=2,
         max_length=150,
-        examples=["Farinha de Trigo Especial 1kg"],
+        examples=["Microcontrolador ESP32-WROOM-32"],
+        description="Nome comercial do produto",
     )
-    sku: str = Field(..., min_length=2, max_length=50, examples=["FAR-TRI-001"])
-    sale_price: Decimal = Field(..., gt=0, decimal_places=2, examples=[8.50])
+    sku: str = Field(
+        ...,
+        min_length=2,
+        max_length=50,
+        examples=["ESP32-WROOM-32"],
+        description="Código identificador único (SKU)",
+    )
     cost_price: Decimal | None = Field(
-        default=None, ge=0, decimal_places=2, examples=[5.20]
+        default=None,
+        ge=0,
+        decimal_places=2,
+        examples=[25.50],
+        description="Preço de custo de aquisição",
     )
-    minimum_stock: int = Field(default=0, ge=0, examples=[10])
-    initial_stock: int = Field(default=0, ge=0, examples=[50])
-
-    category_id: int = Field(..., gt=0, examples=[1])
-    supplier_id: int | None = Field(default=None, gt=0, examples=[2])
+    sale_price: Decimal = Field(
+        ...,
+        gt=0,
+        decimal_places=2,
+        examples=[49.90],
+        description="Preço final de venda ao consumidor",
+    )
+    minimum_stock: int = Field(
+        default=0,
+        ge=0,
+        examples=[5],
+        description="Ponto de pedido / estoque mínimo de segurança",
+    )
+    initial_stock: int = Field(
+        default=0,
+        ge=0,
+        examples=[20],
+        description="Saldo inicial cadastrado no momento da criação",
+    )
+    category_id: int = Field(
+        ...,
+        gt=0,
+        examples=[1],
+        description="ID de uma categoria ativa existente",
+    )
+    supplier_id: int | None = Field(
+        default=None,
+        gt=0,
+        examples=[1],
+        description="ID de um fornecedor ativo existente (opcional)",
+    )
 
 class SupplierSchema(BaseModel):
 
     name: str = Field(
-        min_length=2, max_length=150, description="Nome da fornecedor"
+        ...,
+        min_length=2,
+        max_length=150,
+        examples=["Distribuidora Tech Componentes Ltda"],
+        description="Razão social ou nome fantasia do fornecedor",
     )
     cnpj: str = Field(
         ...,
         pattern=r"^\d{14}$",
-        description="CNPJ da empresa (com ou sem máscara)",
-        examples=["12.345.678/0001-90", "12345678000190"],
+        examples=["12345678000190"],
+        description="CNPJ (14 dígitos numéricos, com ou sem máscara)",
     )
-    email: EmailStr
+    email: EmailStr = Field(
+        ...,
+        examples=["comercial@techcomponentes.com.br"],
+        description="E-mail principal de contato comercial",
+    )
     phone: str | None = Field(
         default=None,
         pattern=r"^\(?\d{2}\)?\s?9?\d{4}-?\d{4}$",
-        description="Telefone com DDD",
-        examples=["75999998888", "(75) 3221-4040"],
+        examples=["75998887766"],
+        description="Telefone de contato com DDD",
     )
     address: str | None = Field(
-        default = None,
+        default=None,
         min_length=3,
         max_length=120,
-        description="Endereco do fornecedor"
+        examples=["Av. Getúlio Vargas, 1500, Centro - Feira de Santana/BA"],
+        description="Endereço físico",
     )
     @field_validator("cnpj", mode="before")
     @classmethod
@@ -377,6 +441,10 @@ class APIResponse(BaseModel, Generic[T]):
     )
 
 class RefreshTokenResponse(BaseModel):
-    acess_token: str
+    acess_token: str = Field(
+        ...,
+        examples=["eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsInR5cGUiOiJyZWZyZXNoIn0..."],
+        description="Token de atualização JWT obtido no login",
+    )
     token_type: str = "bearer"
 
