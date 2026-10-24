@@ -55,7 +55,7 @@ def list_stock_movements(
 
     # 3. Filtro por Usuário que executou
     if user_id is not None:
-        query = query.filter(StockMovement.user_id == user_id)
+        query = query.filter(StockMovement.created_by == user_id)
 
     # 4. Filtro por Tipo de Operação
     if movement_type is not None:
