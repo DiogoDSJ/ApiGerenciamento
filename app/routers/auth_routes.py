@@ -1,12 +1,11 @@
 from fastapi import APIRouter, Depends
 from app.models import User
 from app.dependencies import get_db_session, get_current_user, verify_refresh_token
-from app.security import bcrypt_context, algorithm, token_expire_minutes, secret_key, refresh_token_expire_minutes
+from app.security import bcrypt_context, create_acess_token, create_refresh_token, authenticate_user, algorithm, token_expire_minutes, secret_key, refresh_token_expire_minutes
 from app.schemas import UserSchema, LoginSchema, RefreshTokenRequest, APIResponse, RefreshTokenResponse, TokenSchema
-from jose import jwt, JWTError
-from datetime import datetime, timedelta, timezone
-from app.exceptions import AuthenticationException, UserAlreadyExistsException, UserNotFoundException, EmailAlreadyExistsException
+from app.exceptions import UserAlreadyExistsException, UserNotFoundException, EmailAlreadyExistsException
 from sqlalchemy import or_
+
 
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -15,26 +14,7 @@ def read_root():
     """Rota raiz do módulo de autenticação."""
     return {"message": "Bem-vindo ao módulo de autenticação!"}
 
-def create_acess_token(username):
-    """Função para criar um token de autenticação (JWT) para o usuário."""
-    expire_data = datetime.now(timezone.utc) + timedelta(minutes=token_expire_minutes)
-    payload = {"sub": username, "exp": expire_data, "iat": datetime.now(timezone.utc), "type": "access"}
-    encoded_jwt = jwt.encode(payload, secret_key, algorithm=algorithm)
-    return encoded_jwt
 
-def create_refresh_token(username):
-    """Função para criar um token de atualização (refresh token) para o usuário."""
-    expire_data = datetime.now(timezone.utc) + timedelta(minutes=refresh_token_expire_minutes)
-    payload = {"sub": username, "exp": expire_data, "iat": datetime.now(timezone.utc), "type": "refresh"}
-    encoded_jwt = jwt.encode(payload, secret_key, algorithm=algorithm)
-    return encoded_jwt
-
-def authenticate_user(username, password, db_session):
-    """Função para autenticar um usuário com base no nome de usuário e senha."""
-    user = db_session.query(User).filter(User.username == username, User.deleted_at.is_(None)).first()
-    if not user or not bcrypt_context.verify(password, user.password):
-        raise AuthenticationException()
-    return user
 
 @auth_router.post("/create_user", response_model = APIResponse[UserSchema])
 def create_user(user_data: UserSchema, db_session=Depends(get_db_session)):
