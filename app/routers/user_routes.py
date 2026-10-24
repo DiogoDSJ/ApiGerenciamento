@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, HTTPException, status
+from fastapi import APIRouter, Depends, Query
 from app.models import User, UserRole
 from app.dependencies import get_current_user, require_admin, get_db_session
 from app.schemas import UserSchema, UserUpdate, APIResponse, UserPaginatedResponse, UserResponse

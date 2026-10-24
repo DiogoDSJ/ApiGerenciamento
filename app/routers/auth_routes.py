@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from app.models import User
 from app.dependencies import get_db_session, get_current_user, verify_refresh_token
 from app.security import bcrypt_context, algorithm, token_expire_minutes, secret_key, refresh_token_expire_minutes
@@ -36,7 +36,7 @@ def authenticate_user(username, password, db_session):
         raise AuthenticationException()
     return user
 
-@auth_router.post("/create_user", response_model = APIResponse[UserSchema], status_code=status.HTTP_201_CREATED)
+@auth_router.post("/create_user", response_model = APIResponse[UserSchema])
 def create_user(user_data: UserSchema, db_session=Depends(get_db_session)):
     """Cria um novo usuário no sistema."""
     user = db_session.query(User).filter(or_(User.username == user_data.username, User.email == user_data.email), User.deleted_at.is_(None)).first()
@@ -52,7 +52,7 @@ def create_user(user_data: UserSchema, db_session=Depends(get_db_session)):
         db_session.commit()
     return APIResponse(message="Usuario criado com sucesso", data=new_user)
 
-@auth_router.post("/login", response_model = APIResponse[TokenSchema], status_code=status.HTTP_200_OK)
+@auth_router.post("/login", response_model = APIResponse[TokenSchema])
 def login(loginSchema: LoginSchema = Depends(), db_session=Depends(get_db_session)):
     """Autentica um usuário no sistema."""
     user = authenticate_user(loginSchema.username, loginSchema.password, db_session)
@@ -60,11 +60,11 @@ def login(loginSchema: LoginSchema = Depends(), db_session=Depends(get_db_sessio
     refresh_token = create_refresh_token(user.username)  # Cria um token de atualização (refresh token)
     return APIResponse(message="Login realizado com sucesso", data=TokenSchema(access_token = token, refresh_token = refresh_token))
 
-@auth_router.get("/me", response_model = APIResponse[UserSchema], status_code=status.HTTP_200_OK)
+@auth_router.get("/me", response_model = APIResponse[UserSchema])
 def read_current_user(current_user: User = Depends(get_current_user)):
     return APIResponse(message="Usuario está autenticado", data = current_user)
 
-@auth_router.post("/refresh", response_model = APIResponse[RefreshTokenResponse], status_code=status.HTTP_200_OK)
+@auth_router.post("/refresh", response_model = APIResponse[RefreshTokenResponse])
 def refresh_token_endpoint(payload_data: RefreshTokenRequest, db_session = Depends(get_db_session)): # nao coloquei uma forma de inutilizar o refresh token antigo
     """Recarrega o acess token e da um novo refresh token"""
     username = verify_refresh_token(payload_data.refresh_token)

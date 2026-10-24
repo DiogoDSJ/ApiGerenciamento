@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, Query
 from app.dependencies import get_current_user, get_db_session, require_admin
 from app.models import Supplier, Product
 from app.schemas import SupplierSchema, SupplierResponse, SupplierPaginatedResponse, APIResponse
