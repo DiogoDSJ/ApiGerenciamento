@@ -151,7 +151,7 @@ def restore_product(product_id: int, db_session=Depends(get_db_session), current
 
 
     if not category_is_active:
-        raise CategoryNotActivedException(category_name=category_is_active.name, category_id=category_is_active.id)
+        raise CategoryNotActivedException(category_name = "", category_id=product.category_id)
 
     # 3. Validação do Fornecedor vinculado (se houver, deve estar ativo)
     if product.supplier_id is not None:
