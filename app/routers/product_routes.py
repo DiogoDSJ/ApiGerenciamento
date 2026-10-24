@@ -1,25 +1,24 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, Query
 from app.models import Product, Category, Supplier, StockMovement, MovementType
 from app.dependencies import get_db_session, get_current_user
-from app.schemas import ProductCreate, ProductPaginatedResponse, ProductResponse, ProductUpdate
+from app.schemas import ProductCreate, ProductPaginatedResponse, ProductResponse, ProductUpdate, APIResponse
 from datetime import datetime, timezone
 from sqlalchemy import or_
 from typing import Literal
+from app.exceptions import SupplierNotActivedException, CategoryNotActivedException, ProductStillHaveStockException, SupplierNotFoundException, CategoryNotFoundException, ProductNotFoundException, ProductConflictException, ProductSKUConflictException
 
 product_router = APIRouter(prefix="/product", tags=["product"])
 
-@product_router.get("/{product_id}", response_model=ProductResponse)
+@product_router.get("/{product_id}", response_model = APIResponse[ProductResponse])
 def get_product(product_id: int,db_session = Depends(get_db_session),current_user = Depends(get_current_user)):
     product = (db_session.query(Product).filter(Product.id == product_id, Product.deleted_at.is_(None)).first())
     if not product:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Produto não encontrado.",
-        )
-    return product
+        raise ProductNotFoundException(product_id=product_id)
+    return APIResponse(message="Busca concluida com sucesso", data = product)
 
 
-@product_router.get("", response_model=ProductPaginatedResponse)
+
+@product_router.get("", response_model = APIResponse[ProductPaginatedResponse])
 def search_product(search: str | None = Query(
     default = None, description = "Busca por nome ou SKU"),
                    category_id: int | None = Query(default = None, gt = 0, description = "Filtrar por categoria"),
@@ -53,26 +52,27 @@ def search_product(search: str | None = Query(
 
     offset = (page - 1) * page_size
     products = query.order_by(Product.name.asc()).offset(offset).limit(page_size).all()
-    return ProductPaginatedResponse(total=total, page=page, page_size=page_size, items=products)
+    return APIResponse(message="Busca concluida com sucesso", data = ProductPaginatedResponse(total=total, page=page, page_size=page_size, items=products))
 
 
 
-@product_router.post("/create")
+
+@product_router.post("/create", response_model = APIResponse[ProductResponse])
 def create_product(productSchema: ProductCreate, db_session = Depends(get_db_session), current_user = Depends(get_current_user)):
     conflict_conditions = db_session.query(Product).filter(Product.sku == productSchema.sku).first()
     if conflict_conditions and conflict_conditions.sku == productSchema.sku:
         if conflict_conditions.deleted_at is not None:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT,detail=(f"Já existe um produto desativado com este SKU/Código de barras"f"(ID: {conflict_conditions.id}, Nome: '{conflict_conditions.name}'). "f"Restaure o produto existente em vez de criar um novo."))
+            raise ProductSKUConflictException(sku=conflict_conditions.sku, existing_id=conflict_conditions.id)
         else:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Produto com esse sku já existe")
+            raise ProductSKUConflictException(sku=conflict_conditions.sku, existing_id=conflict_conditions.id, is_inactive=True)
     #verificando se a categoria existe, acho que fornecedor não é obrigatorio, já que o produto pode existir, mas estar sem um fornecedor no momento
     category = db_session.query(Category).filter(Category.id == productSchema.category_id, Category.deleted_at.is_(None)).first()
     if category is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail = "Categoria nao encontrada")
+        raise CategoryNotFoundException(identifier=productSchema.category_id)
     if productSchema.supplier_id is not None:
         supplier = db_session.query(Supplier).filter(Supplier.id == productSchema.supplier_id, Supplier.deleted_at.is_(None)).first()
         if supplier is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail = "Fornecedor nao encontrado")
+            raise SupplierNotFoundException(supplier_id = productSchema.supplier_id)
 
     new_product = Product(name=productSchema.name, sku=productSchema.sku, cost_price=productSchema.cost_price, sale_price= productSchema.sale_price, minimum_stock = productSchema.minimum_stock, stock_quantity= productSchema.initial_stock, category_id=productSchema.category_id, supplier_id=productSchema.supplier_id, created_by=current_user.id)
 
@@ -86,34 +86,34 @@ def create_product(productSchema: ProductCreate, db_session = Depends(get_db_ses
 
     db_session.commit()
     db_session.refresh(new_product)
-    return new_product
+    return APIResponse(message="Produto criado com sucesso", data = new_product)
 
 
-@product_router.patch("/modify", response_model =ProductResponse)
+@product_router.patch("/modify", response_model = APIResponse[ProductResponse])
 def modify_product(product_id: int, product_data: ProductUpdate, db_session = Depends(get_db_session), current_user = Depends(get_current_user)):
 
     product = db_session.query(Product).filter(Product.deleted_at.is_(None), Product.id == product_id).first()
     if not product:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail = "Produto nao encontrado")
+        raise ProductNotFoundException(product_id=product_id)
     update_data = product_data.model_dump(exclude_unset=True)
     new_sku = update_data.get("sku")
     if new_sku:
         product_query = db_session.query(Product).filter(Product.id != product.id, Product.sku == new_sku).first()
         if(product_query):
             if product_query.deleted_at is None:
-                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail = "Já existe um produto com esse sku")
+                raise ProductSKUConflictException(sku=product_query.sku, existing_id=product_query.id)
             else:
-                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail = f"Já existe um produto com esse sku, porem ele está desativado, para restaurar, envie o ID do produto para a rota de restaurar produto, id do produto {product_query.id}")
+                raise ProductSKUConflictException(sku=product_query.sku, existing_id=product_query.id, is_inactive=True)
     new_category = update_data.get("category_id")
     new_supplier = update_data.get("supplier_id")
     if new_category is not None:
         category = db_session.query(Category).filter(Category.id == new_category, Category.deleted_at.is_(None)).first()
         if category is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail = "Categoria nao encontrada")
+            raise CategoryNotFoundException(identifier=new_category)
     if new_supplier is not None:
         supplier = db_session.query(Supplier).filter(Supplier.id == new_supplier, Supplier.deleted_at.is_(None)).first()
         if supplier is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail = "Fornecedor nao encontrado")
+            raise SupplierNotFoundException(supplier_id = new_supplier)
 
     for field, value in update_data.items():
         setattr(product, field, value)
@@ -121,43 +121,44 @@ def modify_product(product_id: int, product_data: ProductUpdate, db_session = De
     product.updated_by = current_user.id
     db_session.commit()
     db_session.refresh(product)
-    return product
+    return APIResponse(message="Produto editado com sucesso", data = product)
 
-@product_router.delete("/delete/{product_id}")
+@product_router.delete("/delete/{product_id}", response_model = APIResponse[ProductResponse])
 def delete_product(product_id: int, db_session=Depends(get_db_session), current_user=Depends(get_current_user)):
     """Exclui um produto do sistema"""
     product = db_session.query(Product).filter(Product.id == product_id, Product.deleted_at.is_(None)).first()
     if not product:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Produto não encontrado.")
+        raise ProductNotFoundException(product_id=product_id)
     if product.stock_quantity > 0:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Produto ainda tem estoque no sistema, é necessario dar baixa ou ajustar a quantidade dos produtos")
+        raise ProductStillHaveStockException(product=product.name)
 
     product.deleted_at = datetime.now(timezone.utc)
     product.deleted_by = current_user.id
     db_session.commit()
-    return None
+    return APIResponse(message="Produto desativado com sucesso", data = product)
 
 
-@product_router.patch("/restore/{product_id}")
+@product_router.patch("/restore/{product_id}", response_model = APIResponse[ProductResponse])
 def restore_product(product_id: int, db_session=Depends(get_db_session), current_user=Depends(get_current_user)):
     """Restaura um produto do sistema"""
     product = db_session.query(Product).filter(Product.id == product_id, Product.deleted_at.is_not(None)).first()
     if not product:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Produto não encontrado na lista de inativos.",)
+        raise ProductNotFoundException(product_id=product_id, is_inactive=True)
     product_verify_sku = db_session.query(Product).filter(Product.sku == product.sku, Product.deleted_at.is_(None), Product.id != product_id).first()
     if product_verify_sku:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Produto com esse SKU já ativo.",)
+        raise ProductSKUConflictException(sku=product_verify_sku.sku, existing_id=product_verify_sku.id)
     category_is_active = (db_session.query(Category.id).filter(Category.id == product.category_id, Category.deleted_at.is_(None)).scalar())
 
 
     if not category_is_active:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail=(f"Não é possível restaurar o produto '{product.name}': a categoria vinculada "f"(ID: {product.category_id}) está desativada. Reative a categoria antes ou "f"altere a categoria do produto."),)
+        raise CategoryNotActivedException(category_name=category_is_active.name, category_id=category_is_active.id)
 
     # 3. Validação do Fornecedor vinculado (se houver, deve estar ativo)
     if product.supplier_id is not None:
         supplier_is_active = (db_session.query(Supplier.id).filter(Supplier.id == product.supplier_id,Supplier.deleted_at.is_(None),).scalar())
         if not supplier_is_active:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,detail=(f"Não é possível restaurar o produto '{product.name}': o fornecedor vinculado "f"(ID: {product.supplier_id}) está desativado. Reative o fornecedor antes ou "f"desvincule-o/altere o fornecedor do produto."),)
+            raise SupplierNotActivedException(supplier_name=supplier_is_active.name, supplier_id=supplier_is_active.id)
+
 
     product.deleted_at = None
     product.deleted_by_id = None
@@ -165,5 +166,5 @@ def restore_product(product_id: int, db_session=Depends(get_db_session), current
 
     db_session.commit()
     db_session.refresh(product)
-    return product
+    return APIResponse(message="Produto resutarado com sucesso", data = product)
 

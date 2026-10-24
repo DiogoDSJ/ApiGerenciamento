@@ -145,37 +145,7 @@ class CategoryHasProductsException(ConflictException):
             details={"category": category},
         )
 
-class SupplierConflictException(ConflictException):
-    """Exceção base para qualquer colisão de dados de fornecedor."""
 
-    error_code = "SUPPLIER_FIELD_CONFLICT"
-
-    def __init__(
-        self,
-        field: str,
-        value: str,
-        existing_id: int | None = None,
-        is_inactive: bool = False,
-    ):
-        status_desc = "desativado" if is_inactive else "ativo"
-        action_desc = (
-            " Restaure o registro em vez de criar outro."
-            if is_inactive
-            else " Informe um valor diferente."
-        )
-
-        super().__init__(
-            message=(
-                f"Já existe um fornecedor {status_desc} cadastrado com o {field} "
-                f"'{value}' (ID: {existing_id}).{action_desc}"
-            ),
-            details={
-                "conflicting_field": field,
-                "value": value,
-                "existing_supplier_id": existing_id,
-                "is_inactive": is_inactive,
-            },
-        )
 
 
 class SupplierAlreadyExistsException(ConflictException):
@@ -196,12 +166,79 @@ class SupplierHasProductsException(ConflictException):
             details={"supplier": supplier},
         )
 
+class ProductStillHaveStockException(ConflictException):
+    error_code = "PRODUCT_STILL_HAS_PRODUCTS"
+
+    def __init__(self, product: str):
+        super().__init__(
+            message=f"O produto {product} ainda tem estoque, é necessario ajustar.",
+            details={"product": product},
+        )
 
 class AdminCantDeleteHimselfException(BusinessRuleException):
     message = "Você não pode excluir sua própria conta de administrador."
 
 class AdminCantRevogateHimselfException(BusinessRuleException):
     message = "Você não pode tirar seus direitos de administrador."
+
+class ProductNotFoundException(NotFoundException):
+    error_code = "PRODUCT_NOT_FOUND"
+
+    def __init__(self, product_id: int, is_inactive: bool = False):
+        msg = (
+            f"Produto inativo com ID {product_id} não encontrado."
+            if is_inactive
+            else f"Produto com ID {product_id} não encontrado."
+        )
+        super().__init__(
+            message=msg,
+            details={"product_id": product_id, "is_inactive": is_inactive},
+        )
+
+class ProductConflictException(ConflictException):
+    """Exceção base para qualquer colisão de dados de produto."""
+
+    error_code = "PRODUCT_FIELD_CONFLICT"
+
+    def __init__(
+        self,
+        field: str,
+        value: str,
+        existing_id: int | None = None,
+        is_inactive: bool = False,
+    ):
+        status_desc = "desativado" if is_inactive else "ativo"
+        action_desc = (
+            " Restaure o registro em vez de criar outro."
+            if is_inactive
+            else " Informe um valor diferente."
+        )
+
+        super().__init__(
+            message=(
+                f"Já existe um produto {status_desc} cadastrado com o {field} "
+                f"'{value}' (ID: {existing_id}).{action_desc}"
+            ),
+            details={
+                "conflicting_field": field,
+                "value": value,
+                "existing_product_id": existing_id,
+                "is_inactive": is_inactive,
+            },
+        )
+
+class ProductSKUConflictException(ProductConflictException):
+    error_code = "PRODUCT_SKU_ALREADY_EXISTS"
+
+    def __init__(
+        self, sku: str, existing_id: int | None = None, is_inactive: bool = False
+    ):
+        super().__init__(
+            field="SKU",
+            value=sku,
+            existing_id=existing_id,
+            is_inactive=is_inactive,
+        )
 
 class SupplierNotFoundException(NotFoundException):
     error_code = "SUPPLIER_NOT_FOUND"
@@ -217,7 +254,23 @@ class SupplierNotFoundException(NotFoundException):
             details={"supplier_id": supplier_id, "is_inactive": is_inactive},
         )
 
+class CategoryNotActivedException(ConflictException):
+    error_code = "CATEGORY_NOT_ACTIVED"
 
+    def __init__(self, category_name: str, category_id: int):
+        super().__init__(
+            message=f"A categoria está desativada, para reativar o produto é necessario ativar-lá ou alterar a categoria, seu nome: {category_name} id: {category_id}",
+            details={"category_name": category_name, "category_id": category_id},
+        )
+
+class SupplierNotActivedException(ConflictException):
+    error_code = "SUPPLIER_NOT_ACTIVED"
+
+    def __init__(self, supplier_name: str, supplier_id: int):
+        super().__init__(
+            message=f"O fornecador está desativado, para reativar o produto é necessario ativar-lá ou alterar a fornecedor, seu nome: {supplier_name} id: {supplier_id}",
+            details={"supplier_name": supplier_name, "supplier_id": supplier_id},
+        )
 
 
 class SupplierConflictException(ConflictException):
