@@ -181,6 +181,29 @@ class AdminCantDeleteHimselfException(BusinessRuleException):
 class AdminCantRevogateHimselfException(BusinessRuleException):
     message = "Você não pode tirar seus direitos de administrador."
 
+class InsufficientStockException(BusinessRuleException):
+    error_code = "INSUFFICIENT_STOCK"
+
+    def __init__(
+        self,
+        operation_type: str,
+        available_quantity: int,
+        requested_quantity: int,
+        product_id: int | None = None,
+    ):
+        super().__init__(
+            message=(
+                f"Estoque insuficiente para {operation_type}. "
+                f"Disponível: {available_quantity}, Solicitado: {requested_quantity}."
+            ),
+            details={
+                "operation_type": operation_type,
+                "available_quantity": available_quantity,
+                "requested_quantity": requested_quantity,
+                "product_id": product_id,
+            },
+        )
+
 class ProductNotFoundException(NotFoundException):
     error_code = "PRODUCT_NOT_FOUND"
 
@@ -194,7 +217,24 @@ class ProductNotFoundException(NotFoundException):
             message=msg,
             details={"product_id": product_id, "is_inactive": is_inactive},
         )
+class InactiveProductMovementException(BusinessRuleException):
+    error_code = "INACTIVE_PRODUCT_MOVEMENT_BLOCKED"
 
+    def __init__(
+        self,
+        product_id: int | None = None,
+        product_name: str | None = None,
+    ):
+        super().__init__(
+            message=(
+                "O produto está desativado. Não é possível realizar movimentações "
+                "de estoque em itens inativos; reative o produto antes de prosseguir."
+            ),
+            details={
+                "product_id": product_id,
+                "product_name": product_name,
+            },
+        )
 class ProductConflictException(ConflictException):
     """Exceção base para qualquer colisão de dados de produto."""
 
