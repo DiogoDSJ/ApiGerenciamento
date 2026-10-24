@@ -55,7 +55,7 @@ def get_specific_user(user_id: int, db_session = Depends(get_db_session), admin_
 @user_router.patch("/update/{user_id}", response_model=APIResponse[UserResponse])
 def modify_user(user_id: int, userUpdate: UserUpdate, db_session = Depends(get_db_session), admin_user = Depends(require_admin)):
     """Modifica um usuario"""
-    user = db_session.query(User).filter(User.id == user_id, User.deleted_at.is_(None)).first()
+    user = db_session.query(User).filter(User.id == user_id).first()
     if user is None:
         raise UserNotFoundException(identifier=str(user_id))
     if userUpdate.role is not None and userUpdate.role != user.role:
