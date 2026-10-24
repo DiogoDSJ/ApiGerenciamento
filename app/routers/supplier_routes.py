@@ -12,6 +12,7 @@ supplier_router = APIRouter(prefix="/supplier", tags=["supplier"])
 
 @supplier_router.get("/{supplier_id}", response_model=APIResponse[SupplierResponse])
 def get_supplier(supplier_id: int,db_session = Depends(get_db_session),current_user = Depends(get_current_user)):
+    """Obtem um fornecedor pelo id e o retorna."""
     supplier = (db_session.query(Supplier).filter(Supplier.id == supplier_id).first())
     if not supplier:
         raise SupplierNotFoundException(supplier_id=supplier_id, is_inactive=False)
@@ -75,6 +76,7 @@ def delete_supplier(supplier_id: int, db_session=Depends(get_db_session), admin_
 
 @supplier_router.patch("/restore/{supplier_id}", response_model = APIResponse[SupplierResponse])
 def restore_supplier(supplier_id, db_session= Depends(get_db_session), admin_user = Depends(require_admin)):
+    """Restaura um fornecedor excluido"""
     supplier = db_session.query(Supplier).filter(Supplier.id == supplier_id).first()
     if not supplier:
         raise SupplierNotFoundException(supplier_id=supplier_id, is_inactive=True)

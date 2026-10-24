@@ -11,6 +11,7 @@ category_router = APIRouter(prefix="/category", tags=["category"])
 
 @category_router.get("/{category_id}", response_model=APIResponse[CategoryResponse])
 def get_category(category_id: int,db_session = Depends(get_db_session),current_user = Depends(get_current_user)):
+    """Obtem informacoes de uma categoria pelo ID dela"""
     category = (db_session.query(Category).filter(Category.id == category_id).first())
     if not category:
         raise CategoryNotFoundException(identifier=category_id)

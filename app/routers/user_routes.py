@@ -92,6 +92,7 @@ def modify_user(user_id: int, userUpdate: UserUpdate, db_session = Depends(get_d
 
 @user_router.delete("/delete/{user_id}", response_model=APIResponse[UserResponse])
 def delete_user(user_id : int, db_session = Depends(get_db_session), admin_user = Depends(require_admin)):
+    """Desativa um usuario, um usuario nao pode  se desativar"""
     if user_id == admin_user.id:
         raise AdminCantDeleteHimselfException
     user = db_session.query(User).filter(User.id == user_id, User.deleted_at.is_(None)).first()
@@ -106,6 +107,7 @@ def delete_user(user_id : int, db_session = Depends(get_db_session), admin_user 
 
 @user_router.patch("/{user_id}/password", response_model=APIResponse[None])
 def change_user_password(user_id : int, new_password : str, db_session = Depends(get_db_session), admin_user = Depends(require_admin)):
+    """Muda senha de um usuario"""
     user = db_session.query(User).filter(User.id == user_id, User.deleted_at.is_(None)).first()
     if user is None:
         raise UserNotFoundException(identifier= str(user_id))
@@ -117,6 +119,7 @@ def change_user_password(user_id : int, new_password : str, db_session = Depends
 
 @user_router.patch("/restore/{user_id}", response_model = APIResponse[UserResponse])
 def restore_user(user_id, db_session= Depends(get_db_session), admin_user = Depends(require_admin)):
+    """Restaura um usuario"""
     user = db_session.query(User).filter(User.id == user_id, User.deleted_at.is_not(None)).first()
     if not user:
         raise UserNotFoundException(identifier=user_id)

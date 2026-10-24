@@ -11,6 +11,7 @@ product_router = APIRouter(prefix="/product", tags=["product"])
 
 @product_router.get("/{product_id}", response_model = APIResponse[ProductResponse])
 def get_product(product_id: int,db_session = Depends(get_db_session),current_user = Depends(get_current_user)):
+    """Acha um produto pelo id e retorna suas informacoes"""
     product = (db_session.query(Product).filter(Product.id == product_id, Product.deleted_at.is_(None)).first())
     if not product:
         raise ProductNotFoundException(product_id=product_id)
@@ -19,8 +20,7 @@ def get_product(product_id: int,db_session = Depends(get_db_session),current_use
 
 
 @product_router.get("", response_model = APIResponse[ProductPaginatedResponse])
-def search_product(search: str | None = Query(
-    default = None, description = "Busca por nome ou SKU"),
+def search_product(search: str | None = Query(default = None, description = "Busca por nome ou SKU"),
                    category_id: int | None = Query(default = None, gt = 0, description = "Filtrar por categoria"),
                    supplier_id: int | None = Query(default = None, gt = 0, description = "Filtrar por fornecedor"),
                    low_stock: bool = Query(default=False, description = "Se verdadeiro, traz os produtos com estoque abaixo do estoque minimo definido daquele produto"),
@@ -30,7 +30,7 @@ def search_product(search: str | None = Query(
                     description="Filtro de estado: 'active' (padrão), 'inactive' (desativados) ou 'all' (todos)"),
                    db_session = Depends(get_db_session),
                    current_user = Depends(get_current_user)):
-
+    """Procura a partir de queries informacoes de produtos cadastrados no sistema"""
     query = db_session.query(Product)
 
     if status_filter == "active":
@@ -59,6 +59,7 @@ def search_product(search: str | None = Query(
 
 @product_router.post("/create", response_model = APIResponse[ProductResponse])
 def create_product(productSchema: ProductCreate, db_session = Depends(get_db_session), current_user = Depends(get_current_user)):
+    """Cria um produto e o retorna"""
     conflict_conditions = db_session.query(Product).filter(Product.sku == productSchema.sku).first()
     if conflict_conditions and conflict_conditions.sku == productSchema.sku:
         if conflict_conditions.deleted_at is not None:
@@ -91,7 +92,7 @@ def create_product(productSchema: ProductCreate, db_session = Depends(get_db_ses
 
 @product_router.patch("/modify", response_model = APIResponse[ProductResponse])
 def modify_product(product_id: int, product_data: ProductUpdate, db_session = Depends(get_db_session), current_user = Depends(get_current_user)):
-
+    """Modifica um produto sendo ele ativo ou inativo e retorna o mesmo"""
     product = db_session.query(Product).filter(Product.deleted_at.is_(None), Product.id == product_id).first()
     if not product:
         raise ProductNotFoundException(product_id=product_id)

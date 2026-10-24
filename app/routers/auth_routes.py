@@ -42,6 +42,7 @@ def login(loginSchema: LoginSchema = Depends(), db_session=Depends(get_db_sessio
 
 @auth_router.get("/me", response_model = APIResponse[UserSchema])
 def read_current_user(current_user: User = Depends(get_current_user)):
+    """Le o usuario logado e devolve o objeto para ver se esta autenticado"""
     return APIResponse(message="Usuario está autenticado", data = current_user)
 
 @auth_router.post("/refresh", response_model = APIResponse[RefreshTokenResponse])
