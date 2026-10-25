@@ -11,12 +11,13 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-estoque_db}
     ports:
       - "5432:5432"
+      - "8000:8000"  # Exposta pelo db porque a API compartilha a rede dele
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-estoque_db}"]
-      interval: 5s
-      timeout: 5s
+      interval: 3s
+      timeout: 3s
       retries: 5
 
   api:
@@ -24,16 +25,15 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: erp_fastapi_app
-    restart: always
+    restart: on-failure
+    network_mode: "service:db"  # Conecta a API diretamente na interface de rede do banco
     depends_on:
       db:
         condition: service_healthy
     env_file:
       - .env
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-estoque_db}
-    ports:
-      - "8000:8000"
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@localhost:5432/${POSTGRES_DB:-estoque_db}
     command: >
       sh -c "alembic upgrade head &&
              uvicorn app.main:app --host 0.0.0.0 --port 8000"
