@@ -1,5 +1,4 @@
-from fastapi import FastAPI, Request, status
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI
 from fastapi.exceptions import RequestValidationError
 from app.error_handlers import (
     app_exception_handler,

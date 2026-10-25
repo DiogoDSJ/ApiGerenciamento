@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from app.models import User
 from app.dependencies import get_db_session, get_current_user, verify_refresh_token
-from app.security import bcrypt_context, create_acess_token, create_refresh_token, authenticate_user, algorithm, token_expire_minutes, secret_key, refresh_token_expire_minutes
+from app.security import bcrypt_context, create_acess_token, create_refresh_token, authenticate_user
 from app.schemas import UserSchema, LoginSchema, RefreshTokenRequest, APIResponse, RefreshTokenResponse, TokenSchema
 from app.exceptions import UserAlreadyExistsException, UserNotFoundException, EmailAlreadyExistsException
 from sqlalchemy import or_

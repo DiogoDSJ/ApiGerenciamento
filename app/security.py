@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 from passlib.context import CryptContext
-from jose import jwt, JWTError
+from jose import jwt
 from datetime import datetime, timedelta, timezone
 from app.exceptions import AuthenticationException
 from app.models import User

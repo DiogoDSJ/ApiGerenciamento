@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query
 from app.models import User, UserRole
-from app.dependencies import get_current_user, require_admin, get_db_session
-from app.schemas import UserSchema, UserUpdate, APIResponse, UserPaginatedResponse, UserResponse
+from app.dependencies import require_admin, get_db_session
+from app.schemas import UserUpdate, APIResponse, UserPaginatedResponse, UserResponse
 from sqlalchemy import or_, func
 from datetime import datetime, timezone
 from app.security import bcrypt_context
