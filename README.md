@@ -1,174 +1,235 @@
-📦 API DE GERENCIAMENTO DE PRODUTOS
+<div align="center">
 
-API REST robusta desenvolvida em FastAPI, SQLAlchemy ORM e PostgreSQL, com foco em integridade transacional, rastreabilidade de estoque com auditoria completa (soft delete) e controle rigoroso de concorrência com bloqueio pessimista.
+# 📦 ERP de Gestão de Estoque & Auditoria
 
-🚀 Tecnologias Utilizadas
+**API REST de alta integridade transacional, rastreabilidade física de estoque e auditoria com soft delete.**
 
-Backend: Python 3.12, FastAPI
+![FastAPI](https://img.shields.io/badge/FastAPI-005571?style=for-the-badge&logo=fastapi)
+![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-316192?style=for-the-badge&logo=postgresql&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
+![Pytest](https://img.shields.io/badge/Pytest-0A9EDC?style=for-the-badge&logo=pytest&logoColor=white)
+![Coverage](https://img.shields.io/badge/Coverage-80%25%2B-brightgreen?style=for-the-badge)
 
-Banco de Dados & ORM: PostgreSQL, SQLAlchemy
+</div>
 
-Migrações: Alembic
+---
 
-Autenticação & Criptografia: JWT (OAuth2 Bearer com Refresh Token), Passlib (Bcrypt)
+## 🧭 Visão Geral
 
-Testes & Cobertura: Pytest, Pytest-Cov (com banco isolado em memória)
+Backend desenvolvido para atender operações de controle de estoque com rigor contábil e auditoria completa. A arquitetura foi projetada para mitigar concorrência destrutiva, garantir integridade referencial antes de qualquer desativação lógica e manter o registro de quem executou cada ação no sistema.
 
-Containerização: Docker e Docker Compose
+> [!IMPORTANT]
+> **Concorrência Atômica:** Operações de saída, perda e ajuste físico de estoque utilizam lock pessimista no banco de dados (`SELECT ... FOR UPDATE`), eliminando cenários de *race condition* e vendas a descoberto.
 
-📐 Decisões de Arquitetura e Regras de Negócio
+---
 
-Controle Estrito de Concorrência (Lock Pessimista):
+## 🛠️ Stack Tecnológica
 
-As movimentações de estoque utilizam with_for_update() no PostgreSQL, garantindo que requisições concorrentes não vendam itens além do saldo disponível (race condition).
+| Componente | Tecnologia | Finalidade |
+| :--- | :--- | :--- |
+| **Linguagem** | Python 3.12 | Base da aplicação |
+| **Framework Web** | FastAPI | Roteamento assíncrono e documentação OpenAPI nativa |
+| **ORM / Banco** | SQLAlchemy & PostgreSQL | Persistência relacional com constraints e partial indexes |
+| **Migrações** | Alembic | Versionamento do schema |
+| **Segurança** | OAuth2 Bearer, JWT, Passlib (Bcrypt) | Autenticação, rotação com refresh tokens e hashing seguro |
+| **Testes** | Pytest, Pytest-Cov | Testes de integração, concorrência e auditoria |
+| **Containerização** | Docker & Docker Compose | Ambientes efêmeros e reprodutibilidade imediata |
 
-Auditoria e Soft Delete:
+---
 
-Produtos, fornecedores, categorias e usuários possuem histórico de quem criou (created_by), editou (updated_by) e desativou (deleted_by).
+## 🏛️ Regras de Negócio e Decisões de Arquitetura
 
-Índices parciais garantem unicidade (SKU, CNPJ, e-mail, nomes) apenas entre itens ativos.
+<details>
+<summary><b>1. Rastreabilidade e Auditoria (Soft Delete)</b></summary>
 
-Travas de Integridade Relacional:
+* Nenhuma entidade crítica (`Product`, `Category`, `Supplier`, `User`) é excluída fisicamente do banco de dados.
+* Campos auditáveis: `created_by`, `created_at`, `updated_by`, `updated_at`, `deleted_by` e `deleted_at`.
+* **Partial Indexes:** Unicidade de regras de negócio (como `SKU`, `CNPJ` e `E-mail`) é restrita a registros ativos (`WHERE deleted_at IS NULL`), viabilizando reaproveitamento de códigos após exclusão lógica.
+</details>
 
-Produtos: Não podem ser excluídos caso ainda tenham saldo em estoque.
+<details>
+<summary><b>2. Travas Relacionais de Exclusão</b></summary>
 
-Categorias e Fornecedores: Não podem ser excluídos se houver produtos ativos associados.
+* **Produtos:** Bloqueio estrito de desativação enquanto houver saldo físico positivo (`stock_quantity > 0`).
+* **Categorias e Fornecedores:** Bloqueio estrito de desativação se houver qualquer produto ativo associado.
+* **Restauração Segura:** Um produto só pode ser restaurado se sua categoria e seu fornecedor vinculados estiverem ativos.
+</details>
 
-Restauração: Um produto desativado só pode ser reativado se sua categoria e seu fornecedor estiverem ativos.
+<details>
+<summary><b>3. Padronização de Contratos HTTP</b></summary>
 
-Padronização de Contratos e Exceções:
+Todas as respostas de sucesso utilizam um envelope uniforme:
 
-Respostas de sucesso envelopadas com APIResponse[T].
+```json
+{
+  "success": true,
+  "message": "Operação realizada com sucesso.",
+  "data": { ... },
+  "timestamp": "2026-10-25T15:30:00Z"
+}
+```
 
-Exceções de domínio mapeadas para códigos HTTP semânticos (400, 401, 404, 409, 422).
+Erros de negócio e validações de esquema retornam status HTTP semânticos (400, 401, 404, 409, 422) acompanhados do identificador estruturado `error_code`.
+</details>
 
-⚙️ Como Executar o Projeto
+---
 
-Escolha uma das duas opções abaixo para rodar o projeto no seu computador:
+## ⚡ Como Executar o Projeto
 
-Opção 1: Executando via Docker (Recomendado)
+Escolha abaixo a forma mais conveniente para inicializar a aplicação no seu ambiente:
 
-Esta opção inicializa a API e o banco de dados PostgreSQL automaticamente sem a necessidade de instalar Python ou Postgres na sua máquina.
+<details open>
+<summary><b>🐳 Opção 1: Via Docker & Docker Compose (Recomendado — Zero Setup)</b></summary>
+<br>
 
-Pré-requisitos:
+Esta abordagem configura automaticamente a API FastAPI, o PostgreSQL e executa as migrações sem a necessidade de instalar Python ou banco de dados localmente.
 
-Docker e Docker Compose instalados.
+> [!TIP]
+> **Pré-requisito único:** Ter o [Docker](https://www.docker.com/) e o Docker Compose instalados e em execução.
 
-Passo a passo:
+#### 1. Clonar o repositório e acessar a pasta raiz:
+```bash
+git clone <URL_DO_REPOSITORIO>
+cd <NOME_DA_PASTA>
+```
 
-Clone o repositório e acesse a pasta raiz:
+#### 2. Configurar variáveis de ambiente:
+```bash
+cp .env.example .env
+```
 
+#### 3. Construir e inicializar os containers:
+```bash
+docker compose up --build -d
+```
+
+> [!NOTE]
+> O container da API aguarda o PostgreSQL atingir o estado `healthy` antes de subir e aplica automaticamente as migrações do banco (`alembic upgrade head`).
+
+#### Status dos Serviços:
+| Serviço | Endpoint Local | Descrição |
+| :--- | :--- | :--- |
+| **FastAPI Backend** | `http://localhost:8000` | Servidor da aplicação |
+| **Documentação Swagger** | `http://localhost:8000/docs` | Interface OpenAPI interativa |
+| **PostgreSQL Database** | `localhost:5432` | Instância persistente do banco |
+
+Para acompanhar os logs da API em tempo real:
+```bash
+docker compose logs -f api
+```
+
+Para desligar o ambiente:
+```bash
+docker compose down
+```
+
+</details>
+
+<details>
+<summary><b>💻 Opção 2: Execução Local Tradicional (Sem Docker)</b></summary>
+<br>
+
+Indicado para desenvolvimento direto ou depuração da aplicação.
+
+> [!TIP]
+> **Pré-requisitos:** Python 3.11+ e uma instância ativa do PostgreSQL rodando localmente.
+
+#### 1. Clonar o repositório e criar o ambiente virtual:
+```bash
 git clone <URL_DO_REPOSITORIO>
 cd <NOME_DA_PASTA>
 
-
-Crie o arquivo de variáveis de ambiente com base no exemplo:
-
-cp .env.example .env
-
-
-Suba os containers da aplicação:
-
-docker compose up --build -d
-
-
-A API estará disponível em: http://localhost:8000
-
-Opção 2: Executando Localmente (Sem Docker)
-
-Pré-requisitos:
-
-Python 3.11+ instalado
-
-PostgreSQL rodando localmente
-
-Passo a passo:
-
-Clone o repositório e crie o ambiente virtual:
-
+# Criar ambiente virtual
 python -m venv venv
+```
 
+#### 2. Ativar o ambiente virtual:
+* **Linux / macOS:**
+  ```bash
+  source venv/bin/activate
+  ```
+* **Windows (PowerShell):**
+  ```powershell
+  .\venv\Scripts\Activate.ps1
+  ```
+* **Windows (CMD):**
+  ```cmd
+  .\venv\Scripts\activate.bat
+  ```
 
-Ative o ambiente virtual:
-
-Linux / macOS:
-
-source venv/bin/activate
-
-
-Windows:
-
-.\venv\Scripts\activate
-
-
-Instale as dependências:
-
+#### 3. Instalar as dependências:
+```bash
 pip install -r requirements.txt
+```
 
-
-Configure o arquivo .env:
-
+#### 4. Configurar variáveis de ambiente:
+```bash
 cp .env.example .env
+```
+*Abra o `.env` e confirme a string de conexão `DATABASE_URL` apontando para o seu PostgreSQL local.*
 
-
-Abra o .env e confirme a string de conexão DATABASE_URL apontando para o seu PostgreSQL local.
-
-Execute as migrações do banco de dados:
-
+#### 5. Executar as migrações do banco de dados:
+```bash
 alembic upgrade head
+```
 
-
-Inicie o servidor FastAPI:
-
+#### 6. Inicializar o servidor Uvicorn:
+```bash
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
 
+</details>
 
-Acesse a API em: http://localhost:8000
+---
 
-📖 Documentação Interativa da API (Swagger / OpenAPI)
+## 📖 Documentação Interativa da API
 
-Com o servidor rodando, abra no navegador para testar os endpoints interativamente:
+Com a aplicação rodando, acesse no navegador para visualizar e testar os contratos com exemplos pré-carregados:
 
-Swagger UI: http://localhost:8000/docs
+* **Swagger UI:** [http://localhost:8000/docs](http://localhost:8000/docs)
+* **ReDoc:** [http://localhost:8000/redoc](http://localhost:8000/redoc)
 
-ReDoc: http://localhost:8000/redoc
+---
 
-🧪 Como Rodar os Testes Automatizados
+## 🧪 Suíte de Testes Automatizados e Cobertura
 
-A suíte de testes utiliza pytest com banco SQLite transacional em memória, garantindo isolamento total e rapidez sem afetar o banco principal.
+Os testes executam contra SQLite transacional em memória (`StaticPool`), permitindo validação ágil, isolamento entre execuções e independência de banco externo.
 
-Para rodar todos os testes com a medição de cobertura de código no terminal e gerar o relatório gráfico:
+Para executar toda a suíte de testes e calcular a cobertura:
 
+```bash
 pytest
+```
 
+### Visualizar o relatório de cobertura em HTML:
 
-Visualizar o relatório de cobertura detalhado (HTML):
+O Pytest gerará a pasta interativa `htmlcov/`:
 
-Após rodar o comando acima, uma pasta htmlcov/ será gerada:
+* **Linux:**
+  ```bash
+  xdg-open htmlcov/index.html
+  ```
+* **Windows:**
+  ```cmd
+  start htmlcov/index.html
+  ```
 
-Linux:
+---
 
-xdg-open htmlcov/index.html
+## 📁 Estrutura do Projeto
 
-
-Windows:
-
-start htmlcov/index.html
-
-
-📁 Estrutura de Pastas
-
-.
-├── alembic/                  # Histórico e scripts de migrações do banco
+```text
+├── alembic/                  # Histórico e scripts de versionamento do banco
 ├── app/
-│   ├── dependencies.py       # Injeções de dependência (JWT, Sessão DB, Admin check)
-│   ├── error_handlers.py     # Handlers globais de exceções da API
+│   ├── dependencies.py       # Injeções de dependência (banco, JWT, admin guard)
+│   ├── error_handlers.py     # Handlers globais de interceptação de erros HTTP
 │   ├── exceptions.py         # Hierarquia de exceções de domínio
 │   ├── main.py               # Inicialização da aplicação FastAPI e routers
 │   ├── models.py             # Modelos SQLAlchemy e mapeamentos relacionais
-│   ├── schemas.py            # Schemas Pydantic (validação e serialização)
-│   ├── security.py           # Funções de hashing (Bcrypt) e JWT
-│   └── routers/              # Endpoints desacoplados por módulo
+│   ├── schemas.py            # Schemas Pydantic V2 (validação e serialização)
+│   ├── security.py           # Utilitários criptográficos (Bcrypt e JWT)
+│   └── routers/              # Endpoints modularizados por domínio
 │       ├── auth_routes.py
 │       ├── category_routes.py
 │       ├── product_routes.py
@@ -176,9 +237,10 @@ start htmlcov/index.html
 │       ├── supplier_routes.py
 │       └── user_routes.py
 ├── tests/                    # Suíte completa de testes automatizados com Pytest
-├── .env.example              # Exemplo de configuração de variáveis de ambiente
-├── docker-compose.yml        # Orquestração do app e banco PostgreSQL
-├── Dockerfile                # Imagem Docker da aplicação
+├── .env.example              # Modelo das variáveis de ambiente necessárias
+├── docker-compose.yml        # Orquestração da API e do banco PostgreSQL
+├── Dockerfile                # Configuração da imagem de container
 ├── pytest.ini                # Configurações do runner de testes e coverage
 ├── requirements.txt          # Dependências travadas do projeto
 └── README.md                 # Documentação técnica do projeto
+```
