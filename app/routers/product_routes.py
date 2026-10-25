@@ -148,11 +148,10 @@ def restore_product(product_id: int, db_session=Depends(get_db_session), current
     product_verify_sku = db_session.query(Product).filter(Product.sku == product.sku, Product.deleted_at.is_(None), Product.id != product_id).first()
     if product_verify_sku:
         raise ProductSKUConflictException(sku=product_verify_sku.sku, existing_id=product_verify_sku.id)
-    category_is_active = (db_session.query(Category.id).filter(Category.id == product.category_id, Category.deleted_at.is_(None)).scalar())
-
-
-    if not category_is_active:
-        raise CategoryNotActivedException(category_name = "", category_id=product.category_id)
+    category = db_session.query(Category).filter(Category.id == product.category_id).first()
+    if not category or category.deleted_at is not None:
+        cat_name = category.name if category else "Desconhecida"
+        raise CategoryNotActivedException(category_name=cat_name, category_id=product.category_id)
 
     # 3. Validação do Fornecedor vinculado (se houver, deve estar ativo)
     if product.supplier_id is not None:
@@ -162,8 +161,8 @@ def restore_product(product_id: int, db_session=Depends(get_db_session), current
 
 
     product.deleted_at = None
-    product.deleted_by_id = None
-    product.updated_by_id = current_user.id
+    product.deleted_by = None
+    product.updated_by = current_user.id
 
     db_session.commit()
     db_session.refresh(product)

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, Query
 from app.models import Category, Product
 from app.dependencies import get_db_session, get_current_user, require_admin
 from app.schemas import CategorySchema, CategoryPaginatedResponse, APIResponse, CategoryResponse
@@ -77,8 +77,8 @@ def restore_category(category_id: int, db_session=Depends(get_db_session), admin
         raise CategoryAlreadyExistsException(category_name=category.name, category_id=category.id)
 
     category.deleted_at = None
-    category.deleted_by_id = None
-    category.updated_by_id = admin_user.id
+    category.deleted_by = None
+    category.updated_by = admin_user.id
 
     db_session.commit()
     db_session.refresh(category)

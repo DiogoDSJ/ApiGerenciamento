@@ -87,8 +87,8 @@ def restore_supplier(supplier_id, db_session= Depends(get_db_session), admin_use
         raise SupplierRestoreConflictException(conflicting_suppliers=details)
 
     supplier.deleted_at = None
-    supplier.deleted_by_id = None
-    supplier.updated_by_id = admin_user.id
+    supplier.deleted_by = None
+    supplier.updated_by = admin_user.id
 
     db_session.commit()
     db_session.refresh(supplier)
