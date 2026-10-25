@@ -106,7 +106,7 @@ class StockMovementCreate(BaseModel):
     @model_validator(mode="after")
     def validate_reason_for_critical_movements(self):
         if(self.movement_type in [MovementType.PERDA, MovementType.AJUSTE]):
-            if not self.reason or self.reason.strip():
+            if not self.reason or not self.reason.strip():
                 raise ValueError(f"O campo 'reason' (justificativa) é obrigatório para movimentações do tipo '{self.movement_type.value}'.")
         return self
 

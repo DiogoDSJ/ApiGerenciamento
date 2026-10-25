@@ -1,9 +1,9 @@
-from app.models import User, db
-from sqlalchemy.orm import sessionmaker, Session
+from jose import JWTError, jwt
+from app.models import User, db, UserRole
+from sqlalchemy.orm import sessionmaker
 from app.security import algorithm, secret_key
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from fastapi import Depends, HTTPException, status
-from jose import JWTError, jwt
+from fastapi import Depends
 from app.exceptions import InvalidCredentialsException, InvalidTokenType, InsufficientPermision
 
 
@@ -55,6 +55,6 @@ def verify_refresh_token(token: str):
 
 def require_admin(current_user: User = Depends(get_current_user)):
     """Trava a rota se o usuário não for administrador."""
-    if current_user.role != "admin":
+    if current_user.role != UserRole.ADMIN and current_user.role != "admin":
         raise InsufficientPermision()
     return current_user
